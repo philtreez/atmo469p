@@ -1,14 +1,13 @@
-// Definiere loadRNBOScript zuerst
 function loadRNBOScript(version) {
     return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = `https://cdn.jsdelivr.net/npm/rnbo@$13.1.1/dist/RNBO.js`;
-        script.onload = () => {
-            console.log("RNBO Script geladen.");
-            resolve();
-        };
-        script.onerror = () => reject(new Error("Fehler beim Laden des RNBO-Skripts."));
-        document.head.appendChild(script);
+        if (/^\d+\.\d+\.\d+-dev$/.test(version)) {
+            return reject(new Error("Patcher exported with a Debug Version! Please specify the correct RNBO version."));
+        }
+        const el = document.createElement("script");
+        el.src = `https://c74-public.nyc3.digitaloceanspaces.com/rnbo/${encodeURIComponent(version)}/rnbo.min.js`;
+        el.onload = resolve;
+        el.onerror = err => reject(new Error("Failed to load rnbo.js v" + version));
+        document.body.append(el);
     });
 }
 
