@@ -103,7 +103,7 @@ function initThree(analyser) {
 
     const geometry = new THREE.BufferGeometry();
     const gridSize = 32;
-    const spacing = 0.3;
+    const spacing = 0.9;
     const positions = new Float32Array(gridSize * gridSize * 3);
 
     let index = 0;
