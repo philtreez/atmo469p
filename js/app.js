@@ -1,82 +1,109 @@
 async function setup() {
     const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
-
-    // Create AudioContext
     const WAContext = window.AudioContext || window.webkitAudioContext;
     const context = new WAContext();
 
-    // Create gain node and connect it to audio output
     const outputNode = context.createGain();
     outputNode.connect(context.destination);
-    
-    // Fetch the exported patcher
-    let response, patcher;
-    try {
-        response = await fetch(patchExportURL);
-        patcher = await response.json();
-    
-        if (!window.RNBO) {
-            // Load RNBO script dynamically
-            // Note that you can skip this by knowing the RNBO version of your patch
-            // beforehand and just include it using a <script> tag
-            await loadRNBOScript(patcher.desc.meta.rnboversion);
-        }
 
-    } catch (err) {
-        const errorContext = {
-            error: err
-        };
-        if (response && (response.status >= 300 || response.status < 200)) {
-            errorContext.header = `Couldn't load patcher export bundle`,
-            errorContext.description = `Check app.js to see what file it's trying to load. Currently it's` +
-            ` trying to load "${patchExportURL}". If that doesn't` + 
-            ` match the name of the file you exported from RNBO, modify` + 
-            ` patchExportURL in app.js.`;
-        }
-        if (typeof guardrails === "function") {
-            guardrails(errorContext);
-        } else {
-            throw err;
-        }
-        return;
-    }
-    
-    // (Optional) Fetch the dependencies
-    let dependencies = [];
-    try {
-        const dependenciesResponse = await fetch("export/dependencies.json");
-        dependencies = await dependenciesResponse.json();
+    let response = await fetch(patchExportURL);
+    let patcher = await response.json();
 
-        // Prepend "export" to any file dependenciies
-        dependencies = dependencies.map(d => d.file ? Object.assign({}, d, { file: "export/" + d.file }) : d);
-    } catch (e) {}
-
-    // Create the device
-    let device;
-    try {
-        device = await RNBO.createDevice({ context, patcher });
-    } catch (err) {
-        if (typeof guardrails === "function") {
-            guardrails({ error: err });
-        } else {
-            throw err;
-        }
-        return;
+    if (!window.RNBO) {
+        await loadRNBOScript(patcher.desc.meta.rnboversion);
     }
 
-    // Connect the device to the web audio graph
+    let device = await RNBO.createDevice({ context, patcher });
     device.node.connect(outputNode);
 
-    // (Optional) Create a form to send messages to RNBO inputs
-    makeInportForm(device);
-
-    // (Optional) Attach listeners to outports so you can log messages from the RNBO patcher
-    attachOutports(device);
+    // WebAudio Analyser für RNBO-Audio
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 512;
+    device.node.connect(analyser);
 
     document.body.onclick = () => {
         context.resume();
-    }
+    };
 
+    initThree(analyser); // Starte Three.js Visualisierung
+}
+
+function initThree(analyser) {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 5;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById("three-container").appendChild(renderer.domElement);
+
+    const vertexShader = `
+        uniform float uTime;
+        uniform float uAudio;
+        varying vec3 vColor;
+        void main() {
+            vec3 pos = position;
+            pos.x += sin(uTime * 0.5 + position.y * 5.0) * uAudio * 0.2;
+            pos.y += cos(uTime * 0.7 + position.x * 3.0) * uAudio * 0.2;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            gl_PointSize = (uAudio * 5.0) + 2.0;
+            vColor = vec3(sin(pos.x + uTime), cos(pos.y + uTime), sin(pos.z + uTime));
+        }
+    `;
+
+    const fragmentShader = `
+        varying vec3 vColor;
+        void main() {
+            gl_FragColor = vec4(vColor, 1.0);
+        }
+    `;
+
+    const uniforms = {
+        uTime: { value: 0.0 },
+        uAudio: { value: 0.0 }
+    };
+
+    const geometry = new THREE.BufferGeometry();
+    const count = 1000;
+    const positions = new Float32Array(count * 3);
+    
+    for (let i = 0; i < count * 3; i++) {
+        positions[i] = (Math.random() - 0.5) * 10;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader,
+        fragmentShader,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        transparent: true
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        
+        let avgFreq = data.reduce((sum, val) => sum + val, 0) / data.length;
+        uniforms.uAudio.value = avgFreq / 255; // RNBO-Audio beeinflusst Partikel
+        uniforms.uTime.value += 0.05;
+        
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+    });
 }
 
 function loadRNBOScript(version) {
