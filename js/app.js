@@ -1,5 +1,18 @@
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.min.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.128/examples/jsm/controls/OrbitControls.js';
+// Lade Three.js und OrbitControls direkt aus dem CDN
+const THREE_SCRIPT = document.createElement("script");
+THREE_SCRIPT.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+document.head.appendChild(THREE_SCRIPT);
+
+const ORBIT_SCRIPT = document.createElement("script");
+ORBIT_SCRIPT.src = "https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js";
+document.head.appendChild(ORBIT_SCRIPT);
+
+THREE_SCRIPT.onload = function () {
+    ORBIT_SCRIPT.onload = function () {
+        setup(); // Starte erst, wenn beide Skripte geladen sind
+    };
+};
+
 
 window.setup = async function setup() {
     const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
