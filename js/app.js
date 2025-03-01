@@ -1,3 +1,6 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+
 async function setup() {
     const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
     const WAContext = window.AudioContext || window.webkitAudioContext;
@@ -35,44 +38,50 @@ function initThree(analyser) {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    document.getElementById("three-container").appendChild(renderer.domElement);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
 
     const vertexShader = `
         uniform float uTime;
-        uniform float uAudio;
+        uniform float uBass;
+        uniform float uMid;
+        uniform float uTreble;
         varying vec3 vColor;
         void main() {
             vec3 pos = position;
-            pos.x += sin(uTime * 0.5 + position.y * 5.0) * uAudio * 0.2;
-            pos.y += cos(uTime * 0.7 + position.x * 3.0) * uAudio * 0.2;
+            pos.x += sin(uTime * 0.5 + position.y * 5.0) * uBass * 0.6;
+            pos.y += cos(uTime * 0.7 + position.x * 3.0) * uMid * 0.6;
+            pos.z += sin(uTime * 0.3 + position.z * 2.0) * uTreble * 0.8;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-            gl_PointSize = (uAudio * 5.0) + 2.0;
-            vColor = vec3(sin(pos.x + uTime), cos(pos.y + uTime), sin(pos.z + uTime));
+            gl_PointSize = (uBass + uMid + uTreble) * 10.0 + 2.0;
+            vColor = vec3(uBass, uMid, uTreble);
         }
     `;
 
     const fragmentShader = `
         varying vec3 vColor;
         void main() {
-            gl_FragColor = vec4(vColor, 1.0);
+            gl_FragColor = vec4(abs(sin(vColor.r * 5.0)), abs(sin(vColor.g * 5.0)), abs(sin(vColor.b * 5.0)), 1.0);
         }
     `;
 
     const uniforms = {
         uTime: { value: 0.0 },
-        uAudio: { value: 0.0 }
+        uBass: { value: 0.0 },
+        uMid: { value: 0.0 },
+        uTreble: { value: 0.0 }
     };
 
     const geometry = new THREE.BufferGeometry();
     const count = 1000;
     const positions = new Float32Array(count * 3);
-    
+
     for (let i = 0; i < count * 3; i++) {
         positions[i] = (Math.random() - 0.5) * 10;
     }
-    
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const material = new THREE.ShaderMaterial({
         uniforms,
         vertexShader,
@@ -81,18 +90,31 @@ function initThree(analyser) {
         depthTest: false,
         transparent: true
     });
-
     const points = new THREE.Points(geometry, material);
     scene.add(points);
+
+    function getAudioData() {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        
+        let bass = data.slice(0, 50).reduce((a, b) => a + b, 0) / 50;
+        let mid = data.slice(50, 200).reduce((a, b) => a + b, 0) / 150;
+        let treble = data.slice(200, 512).reduce((a, b) => a + b, 0) / 312;
+
+        uniforms.uBass.value = bass / 255;
+        uniforms.uMid.value = mid / 255;
+        uniforms.uTreble.value = treble / 255;
+    }
 
     function animate() {
         requestAnimationFrame(animate);
         
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
+        getAudioData();
         
-        let avgFreq = data.reduce((sum, val) => sum + val, 0) / data.length;
-        uniforms.uAudio.value = avgFreq / 255; // RNBO-Audio beeinflusst Partikel
+        let shake = uniforms.uBass.value * 0.05;
+        camera.position.x = shake * (Math.random() - 0.5);
+        camera.position.y = shake * (Math.random() - 0.5);
+        
         uniforms.uTime.value += 0.05;
         
         renderer.render(scene, camera);
@@ -105,42 +127,5 @@ function initThree(analyser) {
         camera.updateProjectionMatrix();
     });
 }
-
-function loadRNBOScript(version) {
-    return new Promise((resolve, reject) => {
-        if (/^\d+\.\d+\.\d+-dev$/.test(version)) {
-            throw new Error("Patcher exported with a Debug Version!\nPlease specify the correct RNBO version to use in the code.");
-        }
-        const el = document.createElement("script");
-        el.src = "https://c74-public.nyc3.digitaloceanspaces.com/rnbo/" + encodeURIComponent(version) + "/rnbo.min.js";
-        el.onload = resolve;
-        el.onerror = function(err) {
-            console.log(err);
-            reject(new Error("Failed to load rnbo.js v" + version));
-        };
-        document.body.append(el);
-    });
-}
-
-function attachOutports(device) {
-    const outports = device.outports;
-    if (outports.length < 1) {
-        document.getElementById("rnbo-console").removeChild(document.getElementById("rnbo-console-div"));
-        return;
-    }
-
-    document.getElementById("rnbo-console").removeChild(document.getElementById("no-outports-label"));
-    device.messageEvent.subscribe((ev) => {
-
-        // Ignore message events that don't belong to an outport
-        if (outports.findIndex(elt => elt.tag === ev.tag) < 0) return;
-
-        // Message events have a tag as well as a payload
-        console.log(`${ev.tag}: ${ev.payload}`);
-
-        document.getElementById("rnbo-console-readout").innerText = `${ev.tag}: ${ev.payload}`;
-    });
-}
-
 
 setup();
