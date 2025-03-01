@@ -31,6 +31,8 @@ window.setup = async function setup() {
     initThree(analyser); // Starte Three.js Visualisierung
 }
 
+window.setup = setup; // Stellt sicher, dass setup() global verfügbar ist
+
 function initThree(analyser) {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -127,5 +129,3 @@ function initThree(analyser) {
         camera.updateProjectionMatrix();
     });
 }
-
-setup();
