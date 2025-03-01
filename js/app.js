@@ -1,16 +1,3 @@
-// Definiere loadRNBOScript zuerst
-function loadRNBOScript(version) {
-    return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = `https://cdn.jsdelivr.net/npm/rnbo@${version}/dist/RNBO.js`;
-        script.onload = () => {
-            console.log("RNBO Script geladen.");
-            resolve();
-        };
-        script.onerror = () => reject(new Error("Fehler beim Laden des RNBO-Skripts."));
-        document.head.appendChild(script);
-    });
-}
 
 // Laden von Three.js und OrbitControls
 const THREE_SCRIPT = document.createElement("script");
@@ -58,6 +45,20 @@ window.setup = async function setup() {
 }
 
 window.setup = setup; // Stellt sicher, dass setup() global verfügbar ist
+
+// Definiere loadRNBOScript zuerst
+function loadRNBOScript(version) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `https://cdn.jsdelivr.net/npm/rnbo@${version}/dist/RNBO.js`;
+        script.onload = () => {
+            console.log("RNBO Script geladen.");
+            resolve();
+        };
+        script.onerror = () => reject(new Error("Fehler beim Laden des RNBO-Skripts."));
+        document.head.appendChild(script);
+    });
+}
 
 function initThree(analyser) {
     const scene = new THREE.Scene();
