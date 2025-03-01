@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
-async function setup() {
+window.setup = async function setup() {
     const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
     const WAContext = window.AudioContext || window.webkitAudioContext;
     const context = new WAContext();
