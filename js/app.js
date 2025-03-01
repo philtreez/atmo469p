@@ -53,8 +53,7 @@ function initThree(analyser) {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
+    document.getElementById('three-container').appendChild(renderer.domElement);
     const controls = new OrbitControls(camera, renderer.domElement);
 
     const vertexShader = `
@@ -141,4 +140,18 @@ function initThree(analyser) {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
     });
+
+    function loadRNBOScript(version) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            // Hier wird das RNBO-Skript anhand der Versionsnummer geladen:
+            script.src = `https://cdn.jsdelivr.net/npm/rnbo@${version}/dist/RNBO.js`;
+            script.onload = () => {
+                console.log("RNBO Script geladen.");
+                resolve();
+            };
+            script.onerror = () => reject(new Error("Fehler beim Laden des RNBO-Skripts."));
+            document.head.appendChild(script);
+        });
+    }    
 }
