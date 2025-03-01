@@ -50,7 +50,7 @@ window.setup = setup; // Stellt sicher, dass setup() global verfügbar ist
 function loadRNBOScript(version) {
     return new Promise((resolve, reject) => {
         const script = document.createElement("script");
-        script.src = `https://cdn.jsdelivr.net/npm/rnbo@${version}/dist/RNBO.js`;
+        script.src = `https://cdn.jsdelivr.net/npm/rnbo@$13.1.1/dist/RNBO.js`;
         script.onload = () => {
             console.log("RNBO Script geladen.");
             resolve();
