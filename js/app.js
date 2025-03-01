@@ -54,7 +54,7 @@ window.setup = async function setup() {
     };
 
     initThree(analyser); // Starte Three.js Visualisierung
-}
+};
 
 window.setup = setup; // Stellt sicher, dass setup() global verfügbar ist
 
@@ -76,11 +76,11 @@ function initThree(analyser) {
         varying vec3 vColor;
         void main() {
             vec3 pos = position;
-            pos.x += sin(uTime * 0.5 + position.y * 5.0) * uBass * 0.6;
-            pos.y += cos(uTime * 0.7 + position.x * 3.0) * uMid * 0.6;
-            pos.z += sin(uTime * 0.3 + position.z * 2.0) * uTreble * 0.8;
+            pos.x += sin(uTime * 0.5 + position.y * 5.0) * uBass * 0.2;
+            pos.y += cos(uTime * 0.7 + position.x * 3.0) * uMid * 0.2;
+            pos.z += sin(uTime * 0.3 + position.z * 2.0) * uTreble * 0.2;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-            gl_PointSize = (uBass + uMid + uTreble) * 10.0 + 2.0;
+            gl_PointSize = 8.0 + (uBass * 12.0);
             vColor = vec3(uBass, uMid, uTreble);
         }
     `;
@@ -88,7 +88,9 @@ function initThree(analyser) {
     const fragmentShader = `
         varying vec3 vColor;
         void main() {
-            gl_FragColor = vec4(abs(sin(vColor.r * 5.0)), abs(sin(vColor.g * 5.0)), abs(sin(vColor.b * 5.0)), 1.0);
+            vec2 grid = floor(gl_FragCoord.xy / 8.0) * 8.0; // Gröbere Pixel-Rasterung
+            float dither = step(0.5, mod(grid.x + grid.y, 10.0) / 10.0);
+            gl_FragColor = vec4(vColor * dither, 1.0);
         }
     `;
 
@@ -100,11 +102,17 @@ function initThree(analyser) {
     };
 
     const geometry = new THREE.BufferGeometry();
-    const count = 1000;
-    const positions = new Float32Array(count * 3);
+    const gridSize = 32;
+    const spacing = 0.3;
+    const positions = new Float32Array(gridSize * gridSize * 3);
 
-    for (let i = 0; i < count * 3; i++) {
-        positions[i] = (Math.random() - 0.5) * 10;
+    let index = 0;
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            positions[index++] = (i - gridSize / 2) * spacing;
+            positions[index++] = (j - gridSize / 2) * spacing;
+            positions[index++] = 0;
+        }
     }
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
