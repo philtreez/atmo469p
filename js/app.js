@@ -1,4 +1,18 @@
-// Lade Three.js und OrbitControls direkt aus dem CDN
+// Definiere loadRNBOScript zuerst
+function loadRNBOScript(version) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `https://cdn.jsdelivr.net/npm/rnbo@${version}/dist/RNBO.js`;
+        script.onload = () => {
+            console.log("RNBO Script geladen.");
+            resolve();
+        };
+        script.onerror = () => reject(new Error("Fehler beim Laden des RNBO-Skripts."));
+        document.head.appendChild(script);
+    });
+}
+
+// Laden von Three.js und OrbitControls
 const THREE_SCRIPT = document.createElement("script");
 THREE_SCRIPT.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
 document.head.appendChild(THREE_SCRIPT);
@@ -12,7 +26,6 @@ THREE_SCRIPT.onload = function () {
         setup(); // Starte erst, wenn beide Skripte geladen sind
     };
 };
-
 
 window.setup = async function setup() {
     const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
@@ -140,18 +153,4 @@ function initThree(analyser) {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
     });
-
-    function loadRNBOScript(version) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            // Hier wird das RNBO-Skript anhand der Versionsnummer geladen:
-            script.src = `https://cdn.jsdelivr.net/npm/rnbo@${version}/dist/RNBO.js`;
-            script.onload = () => {
-                console.log("RNBO Script geladen.");
-                resolve();
-            };
-            script.onerror = () => reject(new Error("Fehler beim Laden des RNBO-Skripts."));
-            document.head.appendChild(script);
-        });
-    }    
 }
