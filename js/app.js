@@ -59,7 +59,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   shape.lineTo(-width / 2, height / 2);
   shape.lineTo(-width / 2, -height / 2);
 
-  const halfHole = holeSize / 1;
+  const halfHole = holeSize / 4;
   const holePath = new THREE.Path();
   holePath.moveTo(-halfHole, -halfHole);
   holePath.lineTo(halfHole, -halfHole);
