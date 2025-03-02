@@ -3,6 +3,7 @@
 // Szene und Kamera
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000); // Schwarzer Hintergrund
+
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
@@ -17,38 +18,38 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 const container = document.getElementById("threejs-container") || document.body;
 container.appendChild(renderer.domElement);
 
-// Effekt Composer für den Glow-Effekt
+// Effekt Composer: RenderPass, BloomPass und GlitchPass
 const composer = new THREE.EffectComposer(renderer);
 const renderPass = new THREE.RenderPass(scene, camera);
 composer.addPass(renderPass);
+
 const bloomPass = new THREE.UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.75,   // Stärke
+  1.0,   // Stärke
   0.4,   // Radius
-  0.55   // Schwellenwert
+  0.85   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 1; // Glowy-Effekt
-bloomPass.radius = 0.2;
+bloomPass.strength = 1.5; // Glowy-Effekt
+bloomPass.radius = 0.5;
 composer.addPass(bloomPass);
+
+// GlitchPass erstellen, standardmäßig deaktiviert
+const glitchPass = new THREE.GlitchPass();
+glitchPass.enabled = false;
+composer.addPass(glitchPass);
 
 // === Tunnel-Effekt Setup ===
 
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
-const numPlanes = 32;
-const planeSpacing = 4;
+const numPlanes = 30;
+const planeSpacing = 10;
 const speed = 16;
 const tunnelPlanes = [];
 
 /**
  * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen quadratischen Loch.
- * Die interne Triangulierung erzeugt auch diagonale Kanten, was dem Grid einen echten 3D-Look verleiht.
- *
- * @param {number} width Gesamtbreite des Grids
- * @param {number} height Gesamthöhe des Grids
- * @param {number} holeSize Seitenlänge des quadratischen Lochs in der Mitte
- * @param {number} segments Detailgrad der Triangulierung
- * @returns {THREE.ShapeGeometry} Die erzeugte Geometrie
+ * Die interne Triangulierung erzeugt diagonale Kanten, was dem Grid einen echten 3D-Look verleiht.
  */
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   const shape = new THREE.Shape();
@@ -70,15 +71,15 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   return new THREE.ShapeGeometry(shape, segments);
 }
 
-// Erzeuge Geometrie: Größe 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
-const gridGeometry = createGridWithSquareHoleGeometry(40, 40, 20, 20);
+// Erzeuge Geometrie: 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
 
-// Für jeden Tunnel-Slice erzeugen wir ein eigenes Material – zunächst im Wireframe-Modus (Neon-Grün)
+// Material: Ursprünglich im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
   return new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 }
 
-// Erzeuge und positioniere die Tunnel-Slices entlang der Z-Achse.
+// Erzeuge und positioniere Tunnel-Slices entlang der Z-Achse.
 for (let i = 0; i < numPlanes; i++) {
   const material = createGridMaterial();
   const gridMesh = new THREE.Mesh(gridGeometry, material);
@@ -87,14 +88,14 @@ for (let i = 0; i < numPlanes; i++) {
   scene.add(gridMesh);
 }
 
-// Erstelle eine Clock, um Delta Time (Zeitdifferenz) zu messen.
+// Clock zur Messung des Delta Time
 const clock = new THREE.Clock();
 
 // Animationsloop: Zeitbasierte Bewegung
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta(); // Sekunden seit letztem Frame
-  
+
   tunnelPlanes.forEach(mesh => {
     mesh.position.z += speed * delta;
     if (mesh.position.z > camera.position.z + planeSpacing / 2) {
@@ -127,7 +128,7 @@ async function setupRNBO() {
     return;
   }
   
-  // (Optional) Abhängigkeiten laden, falls benötigt...
+  // Optionale Abhängigkeiten laden, falls benötigt...
   let dependencies = [];
   try {
     const dependenciesResponse = await fetch("export/dependencies.json");
@@ -166,18 +167,19 @@ function loadRNBOScript(version) {
   });
 }
 
-// RNBO Outport-Listener: reagiert auf den Outport "grider"
-// Bei einer 1 wird zufällig ein Tunnel-Slice ausgewählt, dem für 100 ms ein dicker, glowy Outline-Effekt hinzugefügt wird.
+// RNBO Outport-Listener: reagiert auf "grider" und "glitchy"
+// "grider": Für 100 ms wird ein zufälliger Tunnel-Slice mit einem dicken, glowy Outline-Effekt versehen.
+// "glitchy": Aktiviert oder deaktiviert den GlitchPass.
 function attachOutports(device) {
   device.messageEvent.subscribe((ev) => {
     if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
       const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
       const randomMesh = tunnelPlanes[randomIndex];
-      // Erzeuge einen dicken Outline-Effekt: Erstelle aus der vorhandenen Geometrie ein EdgesGeometry
+      // Erzeuge einen dicken Outline-Effekt: Verwende EdgesGeometry
       const edges = new THREE.EdgesGeometry(randomMesh.geometry);
       const lineMaterial = new THREE.LineBasicMaterial({
-        color: 0x00ff82, // Neon-Grün (ca. RGB 0,255,130)
-        linewidth: 40,   // Hinweis: lineWidth wird in vielen Browsern ignoriert.
+        color: 0x00ff82,       // Neon-Grün (ca. RGB 0,255,130)
+        linewidth: 40,         // Hinweis: lineWidth wird in vielen Browsern ignoriert.
         transparent: true,
         opacity: 0.65,
         blending: THREE.AdditiveBlending,
@@ -185,17 +187,22 @@ function attachOutports(device) {
         depthWrite: false
       });
       const thickOutline = new THREE.LineSegments(edges, lineMaterial);
-      
-      // SKALIEREN: Reduziere den Outline-Block, damit er nur ein kleiner Teil des Slices ist.
+      // SKALIEREN: Mache den Outline-Effekt kleiner, sodass mehr Grid sichtbar bleibt.
       thickOutline.scale.set(0.5, 0.5, 0.5);
-      
-      // Füge den Outline als Kind hinzu, sodass er an derselben Position gerendert wird.
       randomMesh.add(thickOutline);
-      // Entferne den Outline-Effekt nach 100 ms.
       setTimeout(() => {
         randomMesh.remove(thickOutline);
       }, 100);
     }
+    
+    if (ev.tag === "glitchy") {
+      if (parseInt(ev.payload) === 1) {
+        glitchPass.enabled = true;
+      } else {
+        glitchPass.enabled = false;
+      }
+    }
+    
     console.log(`${ev.tag}: ${ev.payload}`);
   });
 }
