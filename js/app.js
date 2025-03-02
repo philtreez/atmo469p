@@ -90,15 +90,15 @@ function loadRNBOScript(version) {
 
 function attachOutports(device) {
     device.messageEvent.subscribe((ev) => {
-        // Suche das div, das in Webflow bereits platziert wurde
+        // Suche das in Webflow platzierte div (z. B. mit id "strip-a", "strip-t", etc.)
         const div = document.getElementById("strip-" + ev.tag);
         if (div) {
             let frame = parseInt(ev.payload);
             if (!isNaN(frame)) {
                 // Begrenze den Frame-Wert auf 0 bis 10
                 frame = Math.max(0, Math.min(10, frame));
-                // Verschiebe den Hintergrund: Frame-Index * 660px (Breite pro Frame)
-                div.style.backgroundPosition = `-${frame * 660}px 0px`;
+                // Verschiebe den Hintergrund vertikal: Frame-Index * 660px (Höhe pro Frame)
+                div.style.backgroundPosition = `0px -${frame * 660}px`;
             }
         }
         // Debug-Ausgabe
