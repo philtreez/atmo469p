@@ -112,52 +112,66 @@ const speed = 0.2;         // Bewegungsgeschwindigkeit
 // Array, in dem die einzelnen Tunnel-Platten gespeichert werden
 const tunnelPlanes = [];
 
-// Funktion, die ein Gitter mit einem quadratischen Loch in der Mitte erstellt
-function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
-  // Erzeuge ein Shape, das ein Rechteck darstellt
-  const shape = new THREE.Shape();
-  shape.moveTo(-width / 2, -height / 2);
-  shape.lineTo(width / 2, -height / 2);
-  shape.lineTo(width / 2, height / 2);
-  shape.lineTo(-width / 2, height / 2);
-  shape.lineTo(-width / 2, -height / 2);
-
-  // Füge ein quadratisches Loch hinzu
-  const halfHole = holeSize / 2;
-  const holePath = new THREE.Path();
-  holePath.moveTo(-halfHole, -halfHole);
-  holePath.lineTo(halfHole, -halfHole);
-  holePath.lineTo(halfHole, halfHole);
-  holePath.lineTo(-halfHole, halfHole);
-  holePath.lineTo(-halfHole, -halfHole);
-  shape.holes.push(holePath);
-
-  // Erzeuge die Geometrie aus dem Shape
-  const geometry = new THREE.ShapeGeometry(shape, segments);
+// Funktion: Erzeuge ein Grid (nur Linien) mit einem quadratischen Loch in der Mitte
+function createGridWithSquareHoleLines(width, height, holeSize, divisionsX, divisionsY) {
+  const positions = [];
+  
+  // Vertikale Linien
+  for (let i = 0; i < divisionsX; i++) {
+      const x = -width / 2 + (width / (divisionsX - 1)) * i;
+      // Liegt x innerhalb des Lochs?
+      if (Math.abs(x) < holeSize / 2) {
+          // Erzeuge zwei Segmente: von unten bis zum Loch und von oberhalb des Lochs bis nach oben
+          positions.push(x, -height / 2, 0);
+          positions.push(x, -holeSize / 2, 0);
+          positions.push(x, holeSize / 2, 0);
+          positions.push(x, height / 2, 0);
+      } else {
+          // Ganze Linie
+          positions.push(x, -height / 2, 0);
+          positions.push(x, height / 2, 0);
+      }
+  }
+  
+  // Horizontale Linien
+  for (let j = 0; j < divisionsY; j++) {
+      const y = -height / 2 + (height / (divisionsY - 1)) * j;
+      if (Math.abs(y) < holeSize / 2) {
+          // Zwei Segmente: von links bis zum Loch und von rechts des Lochs bis nach rechts
+          positions.push(-width / 2, y, 0);
+          positions.push(-holeSize / 2, y, 0);
+          positions.push(holeSize / 2, y, 0);
+          positions.push(width / 2, y, 0);
+      } else {
+          // Ganze Linie
+          positions.push(-width / 2, y, 0);
+          positions.push(width / 2, y, 0);
+      }
+  }
+  
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   return geometry;
 }
 
-// Erzeuge numPlanes Tunnel-Platten mit dem gewünschten Grid-Look
+// Erzeuge die Grid-Geometrie (Parameter kannst du anpassen)
+const gridGeometry = createGridWithSquareHoleLines(50, 50, 20, 10, 10);
+const gridMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff }); // Neon-Magenta für den 80s Look
+
+// Erzeuge Tunnel-Platten als LineSegments, jede mit dem gleichen Grid
 for (let i = 0; i < numPlanes; i++) {
-  // Erzeuge eine Fläche (50 x 50) mit einem quadratischen Loch (Seitenlänge 20) in der Mitte.
-  const geometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xff00ff, // Neon-Magenta für den typischen 80s-Look
-    wireframe: true
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  // Positioniere die Platte entlang der z-Achse
-  mesh.position.z = -i * planeSpacing;
-  tunnelPlanes.push(mesh);
-  scene.add(mesh);
+  const grid = new THREE.LineSegments(gridGeometry, gridMaterial);
+  grid.position.z = -i * planeSpacing;
+  tunnelPlanes.push(grid);
+  scene.add(grid);
 }
 
-// Animationsloop: Verschiebt die Platten, sodass sie an der Kamera vorbeiziehen und einen Tunnel-Effekt erzeugen
+// Animationsloop: Verschiebt die Tunnel-Platten in Richtung Kamera
 function animate() {
   requestAnimationFrame(animate);
   tunnelPlanes.forEach(plane => {
     plane.position.z += speed;
-    // Sobald eine Platte an die Kamera gelangt, wird sie wieder hinten angehängt
+    // Sobald eine Platte an der Kamera vorbeizieht, wird sie ans Ende des Tunnels zurückgesetzt
     if (plane.position.z > camera.position.z + planeSpacing / 2) {
       plane.position.z -= numPlanes * planeSpacing;
     }
