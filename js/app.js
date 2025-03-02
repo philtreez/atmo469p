@@ -87,6 +87,7 @@ function loadRNBOScript(version) {
         document.body.append(el);
     });
 }
+
 // Basis-Setup der Three.js-Szene
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000); // Schwarzer Hintergrund
