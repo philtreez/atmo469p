@@ -35,8 +35,8 @@ composer.addPass(bloomPass);
 // === Tunnel-Effekt Setup ===
 
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
-const numPlanes = 50;
-const planeSpacing = 5;
+const numPlanes = 30;
+const planeSpacing = 10;
 const speed = 16;
 const tunnelPlanes = [];
 
@@ -71,7 +71,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 }
 
 // Erzeuge Geometrie: Größe 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
-const gridGeometry = createGridWithSquareHoleGeometry(35, 35, 15, 15);
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
 
 // Für jeden Tunnel-Slice erzeugen wir ein eigenes Material – zunächst im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
@@ -176,8 +176,8 @@ function attachOutports(device) {
       // Erzeuge einen dicken Outline-Effekt: Erstelle aus der vorhandenen Geometrie ein EdgesGeometry
       const edges = new THREE.EdgesGeometry(randomMesh.geometry);
       const lineMaterial = new THREE.LineBasicMaterial({
-        color: 0x00ff82, // Neon-Grün (0x00ff82 entspricht ca. RGB(0,255,130))
-        linewidth: 100,   // Hinweis: lineWidth wird in vielen Browsern ignoriert
+        color: 0x00ff82, // Neon-Grün (ca. RGB 0,255,130)
+        linewidth: 40,   // Hinweis: lineWidth wird in vielen Browsern ignoriert.
         transparent: true,
         opacity: 0.65,
         blending: THREE.AdditiveBlending,
@@ -185,9 +185,13 @@ function attachOutports(device) {
         depthWrite: false
       });
       const thickOutline = new THREE.LineSegments(edges, lineMaterial);
-      // Füge den Outline als Kind hinzu, damit er exakt positioniert ist
+      
+      // SKALIEREN: Reduziere den Outline-Block, damit er nur ein kleiner Teil des Slices ist.
+      thickOutline.scale.set(0.5, 0.5, 0.5);
+      
+      // Füge den Outline als Kind hinzu, sodass er an derselben Position gerendert wird.
       randomMesh.add(thickOutline);
-      // Entferne den Outline-Effekt nach 100 ms
+      // Entferne den Outline-Effekt nach 100 ms.
       setTimeout(() => {
         randomMesh.remove(thickOutline);
       }, 100);
