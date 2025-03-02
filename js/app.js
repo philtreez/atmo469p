@@ -16,7 +16,6 @@ async function setup() {
         patcher = await response.json();
     
         if (!window.RNBO) {
-            // Lade RNBO-Script dynamisch (alternativ per <script>-Tag einbinden)
             await loadRNBOScript(patcher.desc.meta.rnboversion);
         }
     } catch (err) {
@@ -36,7 +35,7 @@ async function setup() {
         return;
     }
     
-    // (Optional) Hole Abhängigkeiten, falls benötigt
+    // (Optional) Abhängigkeiten laden, falls benötigt
     let dependencies = [];
     try {
         const dependenciesResponse = await fetch("export/dependencies.json");
@@ -57,16 +56,14 @@ async function setup() {
         return;
     }
 
-    // Verbinde das Gerät mit dem AudioGraph
     device.node.connect(outputNode);
 
-    // Initialisiere die Three.js-Szene mit 8 3D-Objekten
+    // Initialisiere die Three.js-Szene im "future retro" Look
     initScene();
 
-    // Outport-Listener: Aktualisiere die 3D-Objekte basierend auf RNBO-Nachrichten
+    // Abonniere RNBO-Nachrichten und steuere die 3D-Objekte
     attachOutports(device);
 
-    // Starte den AudioContext bei einer Nutzerinteraktion
     document.body.onclick = () => {
         context.resume();
     };
@@ -94,41 +91,77 @@ function loadRNBOScript(version) {
 // Globale Variablen für Three.js
 let scene, camera, renderer, sceneObjects = {};
 
-// Initialisiere Three.js-Szene, Kamera, Renderer und 3D-Objekte
+// Erstelle eine Szene mit Grid und verschiedenen wireframe-Objekten
 function initScene() {
-    // Erstelle Szene
+    // Szene und Hintergrund
     scene = new THREE.Scene();
-    // Erstelle Kamera
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 50;
+    scene.background = new THREE.Color(0x000000);
 
-    // Erstelle Renderer und füge ihn dem Webflow-Container hinzu
+    // Kamera
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 40;
+
+    // Renderer – der Canvas wird an den in Webflow angelegten Container angehängt
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     const container = document.getElementById("threejs-container");
     container.appendChild(renderer.domElement);
 
-    // Füge Licht hinzu
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    // Füge einen GridHelper hinzu – futuristischer Vector-Look
+    const gridHelper = new THREE.GridHelper(100, 20, 0x00ff00, 0x005500);
+    scene.add(gridHelper);
+
+    // Licht – schlichte Ambient- und Richtungslichter
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight.position.set(0, 1, 1);
     scene.add(directionalLight);
 
-    // Definiere die Outport-Namen
-    const outportNames = ["a", "t", "m", "o", "four", "six", "nine", "p"];
-
-    // Erzeuge für jeden Outport ein 3D-Objekt (z. B. Würfel) und platziere sie in der Szene
+    // Definiere die Outport-Namen und erzeuge für jeden ein anderes 3D-Objekt
+    const outportNames = ["a", "t", "m", "o", "for", "six", "nine", "p"];
     outportNames.forEach((name, index) => {
-        const geometry = new THREE.BoxGeometry(5, 5, 5);
-        const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
+        let geometry;
+        switch (name) {
+            case "a":
+                geometry = new THREE.BoxGeometry(4, 4, 4);
+                break;
+            case "t":
+                geometry = new THREE.SphereGeometry(3, 16, 16);
+                break;
+            case "m":
+                geometry = new THREE.ConeGeometry(3, 6, 8);
+                break;
+            case "o":
+                geometry = new THREE.CylinderGeometry(2.5, 2.5, 6, 16);
+                break;
+            case "for":
+                geometry = new THREE.TorusGeometry(3, 1, 16, 100);
+                break;
+            case "six":
+                geometry = new THREE.DodecahedronGeometry(3);
+                break;
+            case "nine":
+                geometry = new THREE.OctahedronGeometry(3);
+                break;
+            case "p":
+                geometry = new THREE.TetrahedronGeometry(3);
+                break;
+            default:
+                geometry = new THREE.BoxGeometry(3, 3, 3);
+        }
+        // Verwende ein MeshBasicMaterial im Wireframe-Modus für den Vektor-Look
+        const material = new THREE.MeshBasicMaterial({ 
+            color: Math.random() * 0xffffff, 
+            wireframe: true 
+        });
         const mesh = new THREE.Mesh(geometry, material);
-        // Positioniere die Objekte in einem Kreis
+        // Positioniere die Objekte kreisförmig um den Ursprung
         const angle = (index / outportNames.length) * Math.PI * 2;
         const radius = 20;
         mesh.position.x = Math.cos(angle) * radius;
         mesh.position.y = Math.sin(angle) * radius;
-        mesh.position.z = (Math.random() - 0.5) * 20;
+        mesh.position.z = (Math.random() - 0.5) * 10;
         scene.add(mesh);
         sceneObjects[name] = mesh;
     });
@@ -136,31 +169,30 @@ function initScene() {
     animate();
 }
 
-// Animationsloop: Aktualisiere Szene und rendere sie
+// Animationsloop: Rotiert die Objekte für einen dynamischen Effekt
 function animate() {
     requestAnimationFrame(animate);
-    // Optionale Rotation der Objekte
     Object.values(sceneObjects).forEach(obj => {
-        obj.rotation.x += 0.005;
-        obj.rotation.y += 0.005;
+        obj.rotation.x += 0.01;
+        obj.rotation.y += 0.01;
     });
     renderer.render(scene, camera);
 }
 
-// Abonniere RNBO-Nachrichten und aktualisiere die 3D-Objekte
+// RNBO Outport-Listener: Steuert Eigenschaften der 3D-Objekte
 function attachOutports(device) {
     device.messageEvent.subscribe((ev) => {
         const obj = sceneObjects[ev.tag];
         if (obj) {
             let value = parseInt(ev.payload);
             if (!isNaN(value)) {
-                // Beispiel: Aktualisiere die Skalierung des Objekts basierend auf dem Wert (0 bis 10)
+                // Ändere die Skalierung basierend auf dem Wert (0 bis 10)
                 let scaleFactor = 0.5 + (value / 10) * 2;
                 obj.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-                // Alternativ: Position oder Farbe anpassen, z. B.
-                // obj.position.y = (value - 5) * 2;
-                // obj.material.color.setHSL(value / 10, 1, 0.5);
+                // Passe zusätzlich die Rotation leicht an
+                obj.rotation.z += value * 0.001;
+                // Aktualisiere die Farbe (HSL) für einen retro-futuristischen Effekt
+                obj.material.color.setHSL(value / 10, 1, 0.5);
             }
         }
         console.log(`${ev.tag}: ${ev.payload}`);
