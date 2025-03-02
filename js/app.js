@@ -168,40 +168,55 @@ function loadRNBOScript(version) {
 }
 
 // RNBO Outport-Listener: reagiert auf "grider" und "glitchy"
-// "grider": Für 100 ms wird ein zufälliger Tunnel-Slice mit einem dicken, glowy Outline-Effekt versehen.
-// "glitchy": Aktiviert oder deaktiviert den GlitchPass.
 function attachOutports(device) {
   device.messageEvent.subscribe((ev) => {
     if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
-      const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
-      const randomMesh = tunnelPlanes[randomIndex];
-      // Erzeuge einen dicken Outline-Effekt: Verwende EdgesGeometry
-      const edges = new THREE.EdgesGeometry(randomMesh.geometry);
+      const randomIndex = Math.floor(Math.random() * tunnelSlices.length);
+      const randomSlice = tunnelSlices[randomIndex];
+      
+      // Erzeuge aus der vorhandenen Grid-Geometrie eine EdgesGeometry für den Outline-Effekt
+      const edges = new THREE.EdgesGeometry(gridLinesGeometry);
       const lineMaterial = new THREE.LineBasicMaterial({
         color: 0x00ff82,       // Neon-Grün (ca. RGB 0,255,130)
-        linewidth: 100,         // Hinweis: lineWidth wird in vielen Browsern ignoriert.
-        opacity: 0.4,
+        linewidth: 40,         // Hinweis: linewidth wird in vielen Browsern ignoriert.
+        transparent: true,
+        opacity: 0.65,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
       });
       const thickOutline = new THREE.LineSegments(edges, lineMaterial);
-      // SKALIEREN: Mache den Outline-Effekt kleiner, sodass mehr Grid sichtbar bleibt.
+      // Starte mit einer kleinen Skalierung, sodass der Effekt zunächst dünn wirkt.
       thickOutline.scale.set(0.5, 0.5, 0.5);
-      randomMesh.add(thickOutline);
-      setTimeout(() => {
-        randomMesh.remove(thickOutline);
-      }, 100);
+      randomSlice.add(thickOutline);
+      
+      // Animation: Skaliere den Outline von 0.5 auf 1.5 über 100 ms
+      const initialScale = 0.2;
+      const finalScale = 1.5;
+      const animationDuration = 1500; // in Millisekunden
+      const startTime = performance.now();
+      function animateOutline() {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / animationDuration, 1);
+        const newScale = initialScale + progress * (finalScale - initialScale);
+        thickOutline.scale.set(newScale, newScale, newScale);
+        if (progress < 1) {
+          requestAnimationFrame(animateOutline);
+        } else {
+          // Nach Erreichen des vollen Effekts, entferne ihn nach einer kurzen Pause (z. B. 100 ms)
+          setTimeout(() => {
+            randomSlice.remove(thickOutline);
+          }, 100);
+        }
+      }
+      animateOutline();
     }
     
     if (ev.tag === "glitchy") {
-      if (parseInt(ev.payload) === 1) {
-        glitchPass.enabled = true;
-      } else {
-        glitchPass.enabled = false;
-      }
+      glitchPass.enabled = (parseInt(ev.payload) === 1);
     }
     
     console.log(`${ev.tag}: ${ev.payload}`);
   });
 }
+
