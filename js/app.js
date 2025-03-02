@@ -23,12 +23,12 @@ const renderPass = new THREE.RenderPass(scene, camera);
 composer.addPass(renderPass);
 const bloomPass = new THREE.UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.0,   // Stärke
+  0.8,   // Stärke
   0.4,   // Radius
   0.85   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 1.5; // Glowy-Effekt
+bloomPass.strength = 1; // Glowy-Effekt
 bloomPass.radius = 0.5;
 composer.addPass(bloomPass);
 
@@ -63,7 +63,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 }
 
 // Erzeuge Geometrie (Größe 50x50, zentrales Loch 20x20, feine Unterteilung)
-const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 5, 5);
 
 // Für jeden Tunnel-Slice erzeugen wir ein eigenes Material, damit wir einzelne Slices individuell verändern können.
 function createGridMaterial() {
