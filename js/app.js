@@ -23,25 +23,33 @@ const renderPass = new THREE.RenderPass(scene, camera);
 composer.addPass(renderPass);
 const bloomPass = new THREE.UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.8,   // Stärke
+  1.0,   // Stärke
   0.4,   // Radius
   0.85   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 1; // Glowy-Effekt
+bloomPass.strength = 1.5; // Glowy-Effekt
 bloomPass.radius = 0.5;
 composer.addPass(bloomPass);
 
 // === Tunnel-Effekt Setup ===
 
-// Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16)
+// Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, kann später an BPM angepasst werden)
 const numPlanes = 30;
 const planeSpacing = 10;
 const speed = 16;
 const tunnelPlanes = [];
 
-// Erzeugt ein Grid mit einem quadratischen Loch in der Mitte.
-// Durch die interne Triangulierung der ShapeGeometry entstehen auch diagonale Linien.
+/**
+ * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen quadratischen Loch.
+ * Die interne Triangulierung erzeugt auch diagonale Kanten, was dem Grid einen echten 3D-Look verleiht.
+ *
+ * @param {number} width Gesamtbreite des Grids
+ * @param {number} height Gesamthöhe des Grids
+ * @param {number} holeSize Seitenlänge des quadratischen Lochs in der Mitte
+ * @param {number} segments Detailgrad der Triangulierung
+ * @returns {THREE.ShapeGeometry} Die erzeugte Geometrie
+ */
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   const shape = new THREE.Shape();
   shape.moveTo(-width / 2, -height / 2);
@@ -62,15 +70,15 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   return new THREE.ShapeGeometry(shape, segments);
 }
 
-// Erzeuge Geometrie (Größe 50x50, zentrales Loch 20x20, feine Unterteilung)
-const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 40, 40);
+// Erzeuge Geometrie: Größe 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
 
-// Für jeden Tunnel-Slice erzeugen wir ein eigenes Material, damit wir einzelne Slices individuell verändern können.
+// Für jeden Tunnel-Slice erzeugen wir ein eigenes Material – ursprünglich im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
   return new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 }
 
-// Erzeuge und positioniere die Tunnel-Slices entlang der z-Achse.
+// Erzeuge und positioniere die Tunnel-Slices entlang der Z-Achse.
 for (let i = 0; i < numPlanes; i++) {
   const material = createGridMaterial();
   const gridMesh = new THREE.Mesh(gridGeometry, material);
@@ -86,7 +94,7 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta(); // Sekunden seit letztem Frame
-
+  
   tunnelPlanes.forEach(mesh => {
     mesh.position.z += speed * delta;
     if (mesh.position.z > camera.position.z + planeSpacing / 2) {
@@ -138,7 +146,7 @@ async function setupRNBO() {
   device.node.connect(outputNode);
   attachOutports(device);
   
-  // Resume AudioContext bei einer Nutzerinteraktion
+  // Resume AudioContext bei Nutzerinteraktion
   document.body.onclick = () => context.resume();
 }
 setupRNBO();
@@ -161,22 +169,24 @@ function loadRNBOScript(version) {
 // RNBO Outport-Listener: reagiert auch auf den Outport "grider"
 function attachOutports(device) {
   device.messageEvent.subscribe((ev) => {
-    // Wenn der Outport "grider" 1 sendet, soll zufällig ein Tunnel-Slice aufleuchten.
     if (ev.tag === "grider") {
       if (parseInt(ev.payload) === 1) {
         const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
         const randomMesh = tunnelPlanes[randomIndex];
-        // Speichere die Originalfarbe des Materials
+        // Speichere den ursprünglichen Zustand (wireframe und Farbe)
+        const originalWireframe = randomMesh.material.wireframe;
         const originalColor = randomMesh.material.color.getHex();
-        // Setze die Farbe auf hellgelb (z. B. 0xffff00) – "aufleuchten"
-        randomMesh.material.color.set(0xffff00);
-        // Nach 300 Millisekunden wieder auf die Originalfarbe zurücksetzen
+        // "Aufleuchten": Statt nur die Outline zu färben, wird der Slice kurzzeitig als gefüllte Fläche dargestellt.
+        randomMesh.material.wireframe = false;
+        // Setze die Füllfarbe auf Neon (#00FF82 entspricht 0x00FF82)
+        randomMesh.material.color.set(0x00ff82);
+        // Nach 300 Millisekunden den Originalzustand wiederherstellen.
         setTimeout(() => {
+          randomMesh.material.wireframe = originalWireframe;
           randomMesh.material.color.set(originalColor);
         }, 300);
       }
     }
-    // Debug-Ausgabe
     console.log(`${ev.tag}: ${ev.payload}`);
   });
 }
