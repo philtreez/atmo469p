@@ -35,9 +35,9 @@ composer.addPass(bloomPass);
 // === Tunnel-Effekt Setup ===
 
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, kann später an BPM angepasst werden)
-const numPlanes = 30;
+const numPlanes = 60;
 const planeSpacing = 10;
-const speed = 16;
+const speed = 32;
 const tunnelPlanes = [];
 
 /**
@@ -185,7 +185,7 @@ function attachOutports(device) {
         randomMesh.material.wireframe = false;
         randomMesh.material.color.set(0x00ff00);
         randomMesh.material.transparent = true;
-        randomMesh.material.opacity = 0.65;
+        randomMesh.material.opacity = 0.35;
         
         // Nach 100 Millisekunden den Originalzustand wiederherstellen.
         setTimeout(() => {
