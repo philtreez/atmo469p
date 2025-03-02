@@ -1,163 +1,109 @@
-function loadRNBOScript(version) {
-    return new Promise((resolve, reject) => {
-        if (/^\d+\.\d+\.\d+-dev$/.test(version)) {
-            return reject(new Error("Patcher exported with a Debug Version! Please specify the correct RNBO version."));
-        }
-        const el = document.createElement("script");
-        el.src = `https://c74-public.nyc3.digitaloceanspaces.com/rnbo/${encodeURIComponent(version)}/rnbo.min.js`;
-        el.onload = resolve;
-        el.onerror = err => reject(new Error("Failed to load rnbo.js v" + version));
-        document.body.append(el);
-    });
-}
-
-// Laden von Three.js und OrbitControls
-const THREE_SCRIPT = document.createElement("script");
-THREE_SCRIPT.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
-document.head.appendChild(THREE_SCRIPT);
-
-const ORBIT_SCRIPT = document.createElement("script");
-ORBIT_SCRIPT.src = "https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js";
-document.head.appendChild(ORBIT_SCRIPT);
-
-THREE_SCRIPT.onload = function () {
-    ORBIT_SCRIPT.onload = function () {
-        setup(); // Starte erst, wenn beide Skripte geladen sind
-    };
-};
-
-window.setup = async function setup() {
+async function setup() {
     const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
+
+    // Erstelle AudioContext
     const WAContext = window.AudioContext || window.webkitAudioContext;
     const context = new WAContext();
 
+    // Erstelle Gain-Node und verbinde ihn mit dem Audio-Ausgang
     const outputNode = context.createGain();
     outputNode.connect(context.destination);
+    
+    // Hole den exportierten RNBO-Patcher
+    let response, patcher;
+    try {
+        response = await fetch(patchExportURL);
+        patcher = await response.json();
+    
+        if (!window.RNBO) {
+            // Lade RNBO-Script dynamisch (alternativ via <script>-Tag einbinden)
+            await loadRNBOScript(patcher.desc.meta.rnboversion);
+        }
+    } catch (err) {
+        const errorContext = { error: err };
+        if (response && (response.status >= 300 || response.status < 200)) {
+            errorContext.header = "Couldn't load patcher export bundle";
+            errorContext.description = "Check app.js to see what file it's trying to load. Currently it's " +
+             "trying to load \"" + patchExportURL + "\". If that doesn't " +
+             "match the name of the file you exported from RNBO, modify " +
+             "patchExportURL in app.js.";
+        }
+        if (typeof guardrails === "function") {
+            guardrails(errorContext);
+        } else {
+            throw err;
+        }
+        return;
+    }
+    
+    // (Optional) Hole Abhängigkeiten, falls benötigt
+    let dependencies = [];
+    try {
+        const dependenciesResponse = await fetch("export/dependencies.json");
+        dependencies = await dependenciesResponse.json();
+        dependencies = dependencies.map(d => d.file ? { ...d, file: "export/" + d.file } : d);
+    } catch (e) {}
 
-    let response = await fetch(patchExportURL);
-    let patcher = await response.json();
-
-    if (!window.RNBO) {
-        await loadRNBOScript(patcher.desc.meta.rnboversion);
+    // Erstelle das RNBO-Gerät
+    let device;
+    try {
+        device = await RNBO.createDevice({ context, patcher });
+    } catch (err) {
+        if (typeof guardrails === "function") {
+            guardrails({ error: err });
+        } else {
+            throw err;
+        }
+        return;
     }
 
-    let device = await RNBO.createDevice({ context, patcher });
+    // Verbinde das Gerät mit dem Audiograph
     device.node.connect(outputNode);
 
-    // WebAudio Analyser für RNBO-Audio
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 512;
-    device.node.connect(analyser);
+    // Outport-Listener: Aktualisiere vorhandene divs (z. B. in Webflow angelegt) anhand der RNBO-Nachrichten
+    attachOutports(device);
 
+    // Starte den AudioContext bei einer Nutzerinteraktion
     document.body.onclick = () => {
         context.resume();
     };
 
-    initThree(analyser); // Starte Three.js Visualisierung
-};
+    if (typeof guardrails === "function")
+        guardrails();
+}
 
-window.setup = setup; // Stellt sicher, dass setup() global verfügbar ist
-
-function initThree(analyser) {
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 5;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.getElementById('three-container').appendChild(renderer.domElement);
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-
-    const vertexShader = `
-        uniform float uTime;
-        uniform float uBass;
-        uniform float uMid;
-        uniform float uTreble;
-        varying vec3 vColor;
-        void main() {
-            vec3 pos = position;
-            pos.x += sin(uTime * 0.5 + position.y * 5.0) * uBass * 0.2;
-            pos.y += cos(uTime * 0.7 + position.x * 3.0) * uMid * 0.2;
-            pos.z += sin(uTime * 0.3 + position.z * 2.0) * uTreble * 0.2;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-            gl_PointSize = 8.0 + (uBass * 12.0);
-            vColor = vec3(uBass, uMid, uTreble);
+function loadRNBOScript(version) {
+    return new Promise((resolve, reject) => {
+        if (/^\d+\.\d+\.\d+-dev$/.test(version)) {
+            throw new Error("Patcher exported with a Debug Version!\nPlease specify the correct RNBO version to use in the code.");
         }
-    `;
-
-    const fragmentShader = `
-        varying vec3 vColor;
-        void main() {
-            vec2 grid = floor(gl_FragCoord.xy / 8.0) * 8.0; // Gröbere Pixel-Rasterung
-            float dither = step(0.5, mod(grid.x + grid.y, 10.0) / 10.0);
-            gl_FragColor = vec4(vColor * dither, 1.0);
-        }
-    `;
-
-    const uniforms = {
-        uTime: { value: 0.0 },
-        uBass: { value: 0.0 },
-        uMid: { value: 0.0 },
-        uTreble: { value: 0.0 }
-    };
-
-    const geometry = new THREE.BufferGeometry();
-    const gridSize = 32;
-    const spacing = 0.9;
-    const positions = new Float32Array(gridSize * gridSize * 3);
-
-    let index = 0;
-    for (let i = 0; i < gridSize; i++) {
-        for (let j = 0; j < gridSize; j++) {
-            positions[index++] = (i - gridSize / 2) * spacing;
-            positions[index++] = (j - gridSize / 2) * spacing;
-            positions[index++] = 0;
-        }
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const material = new THREE.ShaderMaterial({
-        uniforms,
-        vertexShader,
-        fragmentShader,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        transparent: true
-    });
-    const points = new THREE.Points(geometry, material);
-    scene.add(points);
-
-    function getAudioData() {
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
-        
-        let bass = data.slice(0, 50).reduce((a, b) => a + b, 0) / 50;
-        let mid = data.slice(50, 200).reduce((a, b) => a + b, 0) / 150;
-        let treble = data.slice(200, 512).reduce((a, b) => a + b, 0) / 312;
-
-        uniforms.uBass.value = bass / 255;
-        uniforms.uMid.value = mid / 255;
-        uniforms.uTreble.value = treble / 255;
-    }
-
-    function animate() {
-        requestAnimationFrame(animate);
-        
-        getAudioData();
-        
-        let shake = uniforms.uBass.value * 0.05;
-        camera.position.x = shake * (Math.random() - 0.5);
-        camera.position.y = shake * (Math.random() - 0.5);
-        
-        uniforms.uTime.value += 0.05;
-        
-        renderer.render(scene, camera);
-    }
-    animate();
-
-    window.addEventListener('resize', () => {
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
+        const el = document.createElement("script");
+        el.src = "https://c74-public.nyc3.digitaloceanspaces.com/rnbo/" + encodeURIComponent(version) + "/rnbo.min.js";
+        el.onload = resolve;
+        el.onerror = function(err) {
+            console.log(err);
+            reject(new Error("Failed to load rnbo.js v" + version));
+        };
+        document.body.append(el);
     });
 }
+
+function attachOutports(device) {
+    device.messageEvent.subscribe((ev) => {
+        // Suche das div, das in Webflow bereits platziert wurde
+        const div = document.getElementById("strip-" + ev.tag);
+        if (div) {
+            let frame = parseInt(ev.payload);
+            if (!isNaN(frame)) {
+                // Begrenze den Frame-Wert auf 0 bis 10
+                frame = Math.max(0, Math.min(10, frame));
+                // Verschiebe den Hintergrund: Frame-Index * 660px (Breite pro Frame)
+                div.style.backgroundPosition = `-${frame * 660}px 0px`;
+            }
+        }
+        // Debug-Ausgabe
+        console.log(`${ev.tag}: ${ev.payload}`);
+    });
+}
+
+setup();
