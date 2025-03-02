@@ -98,7 +98,7 @@ function animate() {
 
   tunnelPlanes.forEach(mesh => {
     mesh.position.z += speed * delta;
-    if (mesh.position.z > camera.position.z + planeSpacing / 2) {
+    if (mesh.position.z > camera.position.z + planeSpacing / 4) {
       mesh.position.z -= numPlanes * planeSpacing;
     }
   });
