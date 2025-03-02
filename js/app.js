@@ -166,25 +166,34 @@ function loadRNBOScript(version) {
   });
 }
 
-// RNBO Outport-Listener: reagiert auch auf den Outport "grider"
+// RNBO Outport-Listener: reagiert auf den Outport "grider"
 function attachOutports(device) {
   device.messageEvent.subscribe((ev) => {
     if (ev.tag === "grider") {
       if (parseInt(ev.payload) === 1) {
         const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
         const randomMesh = tunnelPlanes[randomIndex];
-        // Speichere den ursprünglichen Zustand (wireframe und Farbe)
+        
+        // Speichere den ursprünglichen Zustand
         const originalWireframe = randomMesh.material.wireframe;
         const originalColor = randomMesh.material.color.getHex();
-        // "Aufleuchten": Statt nur die Outline zu färben, wird der Slice kurzzeitig als gefüllte Fläche dargestellt.
+        const originalTransparent = randomMesh.material.transparent;
+        const originalOpacity = randomMesh.material.opacity;
+        
+        // "Aufleuchten": Schalte den Slice von wireframe auf gefüllt um und setze die Füllfarbe auf Neon-Grün (0x00ff00),
+        // mit 65% Opazität (also 0.65) – anstelle des Standard-Wireframe-Looks.
         randomMesh.material.wireframe = false;
-        // Setze die Füllfarbe auf Neon (#00FF82 entspricht 0x00FF82)
-        randomMesh.material.color.set(0x00ff82);
-        // Nach 300 Millisekunden den Originalzustand wiederherstellen.
+        randomMesh.material.color.set(0x00ff00);
+        randomMesh.material.transparent = true;
+        randomMesh.material.opacity = 0.65;
+        
+        // Nach 100 Millisekunden den Originalzustand wiederherstellen.
         setTimeout(() => {
           randomMesh.material.wireframe = originalWireframe;
           randomMesh.material.color.set(originalColor);
-        }, 300);
+          randomMesh.material.transparent = originalTransparent;
+          randomMesh.material.opacity = originalOpacity;
+        }, 100);
       }
     }
     console.log(`${ev.tag}: ${ev.payload}`);
