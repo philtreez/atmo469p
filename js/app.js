@@ -34,10 +34,10 @@ composer.addPass(bloomPass);
 
 // === Tunnel-Effekt Setup ===
 
-// Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, kann später an BPM angepasst werden)
-const numPlanes = 60;
+// Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
+const numPlanes = 30;
 const planeSpacing = 10;
-const speed = 32;
+const speed = 16;
 const tunnelPlanes = [];
 
 /**
@@ -71,9 +71,9 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 }
 
 // Erzeuge Geometrie: Größe 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
-const gridGeometry = createGridWithSquareHoleGeometry(40, 40, 20, 20);
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
 
-// Für jeden Tunnel-Slice erzeugen wir ein eigenes Material – ursprünglich im Wireframe-Modus (Neon-Grün)
+// Für jeden Tunnel-Slice erzeugen wir ein eigenes Material – zunächst im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
   return new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 }
@@ -167,34 +167,30 @@ function loadRNBOScript(version) {
 }
 
 // RNBO Outport-Listener: reagiert auf den Outport "grider"
+// Bei einer 1 wird zufällig ein Tunnel-Slice ausgewählt, dem für 100 ms ein dicker, glowy Outline-Effekt hinzugefügt wird.
 function attachOutports(device) {
   device.messageEvent.subscribe((ev) => {
-    if (ev.tag === "grider") {
-      if (parseInt(ev.payload) === 1) {
-        const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
-        const randomMesh = tunnelPlanes[randomIndex];
-        
-        // Speichere den ursprünglichen Zustand
-        const originalWireframe = randomMesh.material.wireframe;
-        const originalColor = randomMesh.material.color.getHex();
-        const originalTransparent = randomMesh.material.transparent;
-        const originalOpacity = randomMesh.material.opacity;
-        
-        // "Aufleuchten": Schalte den Slice von wireframe auf gefüllt um und setze die Füllfarbe auf Neon-Grün (0x00ff00),
-        // mit 65% Opazität (also 0.65) – anstelle des Standard-Wireframe-Looks.
-        randomMesh.material.wireframe = false;
-        randomMesh.material.color.set(0x00ff00);
-        randomMesh.material.transparent = true;
-        randomMesh.material.opacity = 0.35;
-        
-        // Nach 100 Millisekunden den Originalzustand wiederherstellen.
-        setTimeout(() => {
-          randomMesh.material.wireframe = originalWireframe;
-          randomMesh.material.color.set(originalColor);
-          randomMesh.material.transparent = originalTransparent;
-          randomMesh.material.opacity = originalOpacity;
-        }, 100);
-      }
+    if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
+      const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
+      const randomMesh = tunnelPlanes[randomIndex];
+      // Erzeuge einen dicken Outline-Effekt: Erstelle aus der vorhandenen Geometrie ein EdgesGeometry
+      const edges = new THREE.EdgesGeometry(randomMesh.geometry);
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0x00ff82, // Neon-Grün (0x00ff82 entspricht ca. RGB(0,255,130))
+        linewidth: 40,   // Hinweis: lineWidth wird in vielen Browsern ignoriert
+        transparent: true,
+        opacity: 0.65,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      });
+      const thickOutline = new THREE.LineSegments(edges, lineMaterial);
+      // Füge den Outline als Kind hinzu, damit er exakt positioniert ist
+      randomMesh.add(thickOutline);
+      // Entferne den Outline-Effekt nach 100 ms
+      setTimeout(() => {
+        randomMesh.remove(thickOutline);
+      }, 100);
     }
     console.log(`${ev.tag}: ${ev.payload}`);
   });
