@@ -36,7 +36,7 @@ composer.addPass(bloomPass);
 
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
 const numPlanes = 32;
-const planeSpacing = 10;
+const planeSpacing = 32;
 const speed = 32;
 const tunnelPlanes = [];
 
@@ -71,7 +71,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 }
 
 // Erzeuge Geometrie: Größe 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
-const gridGeometry = createGridWithSquareHoleGeometry(20, 20, 5, 40);
+const gridGeometry = createGridWithSquareHoleGeometry(20, 20, 15, 15);
 
 // Für jeden Tunnel-Slice erzeugen wir ein eigenes Material – zunächst im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
