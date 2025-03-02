@@ -28,16 +28,16 @@ const bloomPass = new THREE.UnrealBloomPass(
   0.85   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 1.5; // Glowy-Effekt
+bloomPass.strength = 1; // Glowy-Effekt
 bloomPass.radius = 0.5;
 composer.addPass(bloomPass);
 
 // === Tunnel-Effekt Setup ===
 
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
-const numPlanes = 30;
+const numPlanes = 64;
 const planeSpacing = 10;
-const speed = 16;
+const speed = 32;
 const tunnelPlanes = [];
 
 /**
@@ -71,7 +71,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 }
 
 // Erzeuge Geometrie: Größe 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
-const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 5, 20);
 
 // Für jeden Tunnel-Slice erzeugen wir ein eigenes Material – zunächst im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
