@@ -16,7 +16,7 @@ async function setup() {
         patcher = await response.json();
     
         if (!window.RNBO) {
-            // Lade RNBO-Script dynamisch (alternativ via <script>-Tag einbinden)
+            // Lade RNBO-Script dynamisch (alternativ per <script>-Tag einbinden)
             await loadRNBOScript(patcher.desc.meta.rnboversion);
         }
     } catch (err) {
@@ -57,10 +57,13 @@ async function setup() {
         return;
     }
 
-    // Verbinde das Gerät mit dem Audiograph
+    // Verbinde das Gerät mit dem AudioGraph
     device.node.connect(outputNode);
 
-    // Outport-Listener: Aktualisiere vorhandene divs (z. B. in Webflow angelegt) anhand der RNBO-Nachrichten
+    // Initialisiere die Three.js-Szene mit 8 3D-Objekten
+    initScene();
+
+    // Outport-Listener: Aktualisiere die 3D-Objekte basierend auf RNBO-Nachrichten
     attachOutports(device);
 
     // Starte den AudioContext bei einer Nutzerinteraktion
@@ -88,20 +91,78 @@ function loadRNBOScript(version) {
     });
 }
 
+// Globale Variablen für Three.js
+let scene, camera, renderer, sceneObjects = {};
+
+// Initialisiere Three.js-Szene, Kamera, Renderer und 3D-Objekte
+function initScene() {
+    // Erstelle Szene
+    scene = new THREE.Scene();
+    // Erstelle Kamera
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 50;
+
+    // Erstelle Renderer und füge ihn dem Webflow-Container hinzu
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    const container = document.getElementById("threejs-container");
+    container.appendChild(renderer.domElement);
+
+    // Füge Licht hinzu
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight.position.set(0, 1, 1);
+    scene.add(directionalLight);
+
+    // Definiere die Outport-Namen
+    const outportNames = ["a", "t", "m", "o", "four", "six", "nine", "p"];
+
+    // Erzeuge für jeden Outport ein 3D-Objekt (z. B. Würfel) und platziere sie in der Szene
+    outportNames.forEach((name, index) => {
+        const geometry = new THREE.BoxGeometry(5, 5, 5);
+        const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
+        const mesh = new THREE.Mesh(geometry, material);
+        // Positioniere die Objekte in einem Kreis
+        const angle = (index / outportNames.length) * Math.PI * 2;
+        const radius = 20;
+        mesh.position.x = Math.cos(angle) * radius;
+        mesh.position.y = Math.sin(angle) * radius;
+        mesh.position.z = (Math.random() - 0.5) * 20;
+        scene.add(mesh);
+        sceneObjects[name] = mesh;
+    });
+
+    animate();
+}
+
+// Animationsloop: Aktualisiere Szene und rendere sie
+function animate() {
+    requestAnimationFrame(animate);
+    // Optionale Rotation der Objekte
+    Object.values(sceneObjects).forEach(obj => {
+        obj.rotation.x += 0.005;
+        obj.rotation.y += 0.005;
+    });
+    renderer.render(scene, camera);
+}
+
+// Abonniere RNBO-Nachrichten und aktualisiere die 3D-Objekte
 function attachOutports(device) {
     device.messageEvent.subscribe((ev) => {
-        // Suche das in Webflow platzierte div (z. B. mit id "strip-a", "strip-t", etc.)
-        const div = document.getElementById("strip-" + ev.tag);
-        if (div) {
-            let frame = parseInt(ev.payload);
-            if (!isNaN(frame)) {
-                // Begrenze den Frame-Wert auf 0 bis 10
-                frame = Math.max(0, Math.min(10, frame));
-                // Verschiebe den Hintergrund vertikal: Frame-Index * 660px (Höhe pro Frame)
-                div.style.backgroundPosition = `0px -${frame * 660}px`;
+        const obj = sceneObjects[ev.tag];
+        if (obj) {
+            let value = parseInt(ev.payload);
+            if (!isNaN(value)) {
+                // Beispiel: Aktualisiere die Skalierung des Objekts basierend auf dem Wert (0 bis 10)
+                let scaleFactor = 0.5 + (value / 10) * 2;
+                obj.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+                // Alternativ: Position oder Farbe anpassen, z. B.
+                // obj.position.y = (value - 5) * 2;
+                // obj.material.color.setHSL(value / 10, 1, 0.5);
             }
         }
-        // Debug-Ausgabe
         console.log(`${ev.tag}: ${ev.payload}`);
     });
 }
