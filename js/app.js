@@ -44,7 +44,7 @@ composer.addPass(glitchPass);
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
 const numPlanes = 60;
 const planeSpacing =10;
-const speed = 16;
+const speed = 2;
 const tunnelPlanes = [];
 
 /**
