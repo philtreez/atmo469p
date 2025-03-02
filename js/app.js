@@ -192,7 +192,7 @@ function attachOutports(device) {
       
       // Animation: Skaliere den Outline von 0.5 auf 1.5 über 100 ms
       const initialScale = 0.2;
-      const finalScale = 1.5;
+      const finalScale = 5;
       const animationDuration = 1500; // in Millisekunden
       const startTime = performance.now();
       function animateOutline() {
@@ -206,7 +206,7 @@ function attachOutports(device) {
           // Nach Erreichen des vollen Effekts, entferne ihn nach einer kurzen Pause (z. B. 100 ms)
           setTimeout(() => {
             randomSlice.remove(thickOutline);
-          }, 100);
+          }, 1500);
         }
       }
       animateOutline();
