@@ -95,12 +95,20 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta(); // Sekunden seit letztem Frame
 
-  // Kamera-Effekt: leichte horizontale Bewegung und Rotation
+  // Optionaler Kamera-Effekt (falls du ihn zusätzlich verwenden möchtest)
   camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
   camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
 
   tunnelPlanes.forEach(mesh => {
+    // Standardmäßige Vorwärtsbewegung entlang der Z-Achse
     mesh.position.z += speed * delta;
+    
+    // Zusätzliche seitliche Bewegung: Erzeugt den Eindruck einer Kurve
+    mesh.position.x = Math.sin((mesh.position.z + clock.elapsedTime) * 0.1) * 0.5;
+    
+    // Optionale Neigung/Rotation für einen noch dynamischeren Effekt
+    mesh.rotation.z = Math.sin((mesh.position.z + clock.elapsedTime) * 0.1) * 0.1;
+    
     if (mesh.position.z > camera.position.z + planeSpacing / 2) {
       mesh.position.z -= numPlanes * planeSpacing;
     }
