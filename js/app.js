@@ -105,48 +105,58 @@ const container = document.getElementById("threejs-container") || document.body;
 container.appendChild(renderer.domElement);
 
 // Parameter für den Tunnel
-const numPlanes = 30;      // Anzahl der Tunnel-Platten
-const planeSpacing = 10;   // Abstand zwischen den Platten
+const numPlanes = 30;      // Anzahl der Tunnel-Schnitte
+const planeSpacing = 10;   // Abstand zwischen den Schnitten
 const speed = 0.2;         // Bewegungsgeschwindigkeit
 
-// Array, in dem die einzelnen Tunnel-Platten gespeichert werden
+// Array, in dem die Tunnel-Schnitte gespeichert werden
 const tunnelPlanes = [];
 
-// Funktion: Erzeuge ein Grid (nur Linien) mit einem quadratischen Loch in der Mitte
+/**
+ * Erzeugt ein Linien-Grid, bestehend aus horizontalen und vertikalen Linien,
+ * mit einem zentralen quadratischen Loch (ohne diagonale Linien).
+ *
+ * @param {number} width Gesamtbreite des Grids
+ * @param {number} height Gesamthöhe des Grids
+ * @param {number} holeSize Seitenlänge des quadratischen Lochs in der Mitte
+ * @param {number} divisionsX Anzahl der vertikalen Teilungen
+ * @param {number} divisionsY Anzahl der horizontalen Teilungen
+ * @returns {THREE.BufferGeometry} BufferGeometry mit den berechneten Linien
+ */
 function createGridWithSquareHoleLines(width, height, holeSize, divisionsX, divisionsY) {
   const positions = [];
   
   // Vertikale Linien
   for (let i = 0; i < divisionsX; i++) {
-      const x = -width / 2 + (width / (divisionsX - 1)) * i;
-      // Liegt x innerhalb des Lochs?
-      if (Math.abs(x) < holeSize / 2) {
-          // Erzeuge zwei Segmente: von unten bis zum Loch und von oberhalb des Lochs bis nach oben
-          positions.push(x, -height / 2, 0);
-          positions.push(x, -holeSize / 2, 0);
-          positions.push(x, holeSize / 2, 0);
-          positions.push(x, height / 2, 0);
-      } else {
-          // Ganze Linie
-          positions.push(x, -height / 2, 0);
-          positions.push(x, height / 2, 0);
-      }
+    const x = -width / 2 + (width / (divisionsX - 1)) * i;
+    // Liegt diese Linie innerhalb des Loch-Bereichs?
+    if (Math.abs(x) < holeSize / 2) {
+      // Erzeuge zwei separate Linien: von unten bis zum Loch und von oberhalb des Lochs bis nach oben
+      positions.push(x, -height / 2, 0);
+      positions.push(x, -holeSize / 2, 0);
+      positions.push(x, holeSize / 2, 0);
+      positions.push(x, height / 2, 0);
+    } else {
+      // Eine einzelne Linie von unten bis oben
+      positions.push(x, -height / 2, 0);
+      positions.push(x, height / 2, 0);
+    }
   }
   
   // Horizontale Linien
   for (let j = 0; j < divisionsY; j++) {
-      const y = -height / 2 + (height / (divisionsY - 1)) * j;
-      if (Math.abs(y) < holeSize / 2) {
-          // Zwei Segmente: von links bis zum Loch und von rechts des Lochs bis nach rechts
-          positions.push(-width / 2, y, 0);
-          positions.push(-holeSize / 2, y, 0);
-          positions.push(holeSize / 2, y, 0);
-          positions.push(width / 2, y, 0);
-      } else {
-          // Ganze Linie
-          positions.push(-width / 2, y, 0);
-          positions.push(width / 2, y, 0);
-      }
+    const y = -height / 2 + (height / (divisionsY - 1)) * j;
+    if (Math.abs(y) < holeSize / 2) {
+      // Zwei separate Linien: von links bis zum Loch und von rechts des Lochs bis ganz rechts
+      positions.push(-width / 2, y, 0);
+      positions.push(-holeSize / 2, y, 0);
+      positions.push(holeSize / 2, y, 0);
+      positions.push(width / 2, y, 0);
+    } else {
+      // Eine einzelne Linie von links nach rechts
+      positions.push(-width / 2, y, 0);
+      positions.push(width / 2, y, 0);
+    }
   }
   
   const geometry = new THREE.BufferGeometry();
@@ -154,11 +164,11 @@ function createGridWithSquareHoleLines(width, height, holeSize, divisionsX, divi
   return geometry;
 }
 
-// Erzeuge die Grid-Geometrie (Parameter kannst du anpassen)
+// Erzeuge die Grid-Geometrie: Gesamtgröße 50x50, Lochgröße 20, 10 Teilungen in X und Y
 const gridGeometry = createGridWithSquareHoleLines(50, 50, 20, 10, 10);
-const gridMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff }); // Neon-Magenta für den 80s Look
+const gridMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff }); // Neon-Magenta, typischer 80s Look
 
-// Erzeuge Tunnel-Platten als LineSegments, jede mit dem gleichen Grid
+// Erzeuge numPlanes Tunnel-Schnitte, alle mit dem gleichen Linien-Grid
 for (let i = 0; i < numPlanes; i++) {
   const grid = new THREE.LineSegments(gridGeometry, gridMaterial);
   grid.position.z = -i * planeSpacing;
@@ -166,12 +176,12 @@ for (let i = 0; i < numPlanes; i++) {
   scene.add(grid);
 }
 
-// Animationsloop: Verschiebt die Tunnel-Platten in Richtung Kamera
+// Animationsloop: Verschiebt die Tunnel-Schnitte in Richtung der Kamera
 function animate() {
   requestAnimationFrame(animate);
   tunnelPlanes.forEach(plane => {
     plane.position.z += speed;
-    // Sobald eine Platte an der Kamera vorbeizieht, wird sie ans Ende des Tunnels zurückgesetzt
+    // Wird ein Schnitt vor die Kamera verschoben, setze ihn wieder ans Ende des Tunnels
     if (plane.position.z > camera.position.z + planeSpacing / 2) {
       plane.position.z -= numPlanes * planeSpacing;
     }
@@ -181,24 +191,5 @@ function animate() {
 
 animate();
 
-// RNBO Outport-Listener: Steuert Eigenschaften der 3D-Objekte
-function attachOutports(device) {
-    device.messageEvent.subscribe((ev) => {
-        const obj = sceneObjects[ev.tag];
-        if (obj) {
-            let value = parseInt(ev.payload);
-            if (!isNaN(value)) {
-                // Ändere die Skalierung basierend auf dem Wert (0 bis 10)
-                let scaleFactor = 0.5 + (value / 10) * 2;
-                obj.scale.set(scaleFactor, scaleFactor, scaleFactor);
-                // Passe zusätzlich die Rotation leicht an
-                obj.rotation.z += value * 0.001;
-                // Aktualisiere die Farbe (HSL) für einen retro-futuristischen Effekt
-                obj.material.color.setHSL(value / 10, 1, 0.5);
-            }
-        }
-        console.log(`${ev.tag}: ${ev.payload}`);
-    });
-}
 
 setup();
