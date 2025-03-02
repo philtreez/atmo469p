@@ -43,7 +43,7 @@ composer.addPass(glitchPass);
 
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
 const numPlanes = 60;
-const planeSpacing = 5;
+const planeSpacing =10;
 const speed = 16;
 const tunnelPlanes = [];
 
@@ -179,7 +179,7 @@ function attachOutports(device) {
       const edges = new THREE.EdgesGeometry(randomMesh.geometry);
       const lineMaterial = new THREE.LineBasicMaterial({
         color: 0x00ff82,       // Neon-Grün (ca. RGB 0,255,130)
-        linewidth: 20,         // Hinweis: lineWidth wird in vielen Browsern ignoriert.
+        linewidth: 100,         // Hinweis: lineWidth wird in vielen Browsern ignoriert.
         transparent: true,
         opacity: 0.65,
         blending: THREE.AdditiveBlending,
