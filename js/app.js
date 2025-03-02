@@ -72,7 +72,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 }
 
 // Erzeuge Geometrie: 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
-const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
+const gridGeometry = createGridWithSquareHoleGeometry(30, 30, 20, 20);
 
 // Material: Ursprünglich im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
