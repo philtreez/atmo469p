@@ -87,8 +87,7 @@ function loadRNBOScript(version) {
         document.body.append(el);
     });
 }
-
-/// Basis-Setup der Three.js-Szene
+// Basis-Setup der Three.js-Szene
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000); // Schwarzer Hintergrund
 
@@ -102,41 +101,58 @@ camera.position.z = 5;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-
-// Hänge den Renderer an einen Container in Webflow (z.B. mit der ID "threejs-container")
 const container = document.getElementById("threejs-container") || document.body;
 container.appendChild(renderer.domElement);
 
 // Parameter für den Tunnel
-const numPlanes = 30;       // Anzahl der Gitterplatten
-const planeSpacing = 10;    // Abstand zwischen den Platten
-const speed = 0.2;          // Geschwindigkeit der Bewegung
+const numPlanes = 30;      // Anzahl der Tunnel-Platten
+const planeSpacing = 10;   // Abstand zwischen den Platten
+const speed = 0.2;         // Bewegungsgeschwindigkeit
 
-// Array, in dem die einzelnen Gitter-Platten gespeichert werden
+// Array, in dem die einzelnen Tunnel-Platten gespeichert werden
 const tunnelPlanes = [];
 
-// Erzeuge numPlanes Plane-Meshes mit Wireframe-Material
-for (let i = 0; i < numPlanes; i++) {
-  // Erzeuge ein Plane-Geometry mit Segmenten, damit das Wireframe einen Gitter-Look hat
-  const geometry = new THREE.PlaneGeometry(50, 50, 20, 20);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x00ffff, // Neon-Türkis, klassischer 80er Look
-    wireframe: true
-  });
-  const plane = new THREE.Mesh(geometry, material);
-  // Positioniere die Platte entlang der z-Achse
-  plane.position.z = -i * planeSpacing;
-  tunnelPlanes.push(plane);
-  scene.add(plane);
+// Funktion, die ein Gitter mit Loch in der Mitte erstellt
+function createGridWithHoleGeometry(width, height, holeRadius, segments) {
+  // Erzeuge ein Shape, das ein Rechteck darstellt
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2, -height / 2);
+  shape.lineTo(width / 2, -height / 2);
+  shape.lineTo(width / 2, height / 2);
+  shape.lineTo(-width / 2, height / 2);
+  shape.lineTo(-width / 2, -height / 2);
+
+  // Füge ein Loch (hier rund) hinzu
+  const holePath = new THREE.Path();
+  holePath.absarc(0, 0, holeRadius, 0, Math.PI * 2, true);
+  shape.holes.push(holePath);
+
+  // Erzeuge die Geometrie aus dem Shape
+  const geometry = new THREE.ShapeGeometry(shape, segments);
+  return geometry;
 }
 
-// Animationsloop: Bewegt die Platten in Richtung Kamera, um einen Tunnel-Effekt zu erzeugen
+// Erzeuge numPlanes Tunnel-Platten mit dem gewünschten Gitter-Look
+for (let i = 0; i < numPlanes; i++) {
+  // Erzeuge eine Fläche (50 x 50) mit einem Loch (Radius 10) in der Mitte.
+  const geometry = createGridWithHoleGeometry(50, 50, 10, 20);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x00ffff, // Neon-Türkis, typisch für 80er-Jahre
+    wireframe: true
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  // Positioniere die Platte entlang der z-Achse
+  mesh.position.z = -i * planeSpacing;
+  tunnelPlanes.push(mesh);
+  scene.add(mesh);
+}
+
+// Animationsloop: Verschiebt die Platten, sodass sie an der Kamera vorbeiziehen und so einen Tunnel-Effekt erzeugen
 function animate() {
   requestAnimationFrame(animate);
   tunnelPlanes.forEach(plane => {
-    // Bewege die Platte nach vorne (Richtung der Kamera)
     plane.position.z += speed;
-    // Wenn die Platte die Kamera passiert hat, setze sie ans Ende des Tunnels
+    // Sobald eine Platte an die Kamera gelangt, wird sie wieder hinten angehängt
     if (plane.position.z > camera.position.z + planeSpacing / 2) {
       plane.position.z -= numPlanes * planeSpacing;
     }
