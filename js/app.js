@@ -1,8 +1,9 @@
 // === Three.js + Post-Processing Setup ===
 
-// Szene, Kamera und Renderer
+// Szene und Kamera
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
+scene.background = new THREE.Color(0x000000); // Schwarzer Hintergrund
+
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
@@ -10,6 +11,8 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 camera.position.z = 5;
+
+// Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 const container = document.getElementById("threejs-container") || document.body;
@@ -17,96 +20,89 @@ container.appendChild(renderer.domElement);
 
 // Effekt Composer: RenderPass, BloomPass und GlitchPass
 const composer = new THREE.EffectComposer(renderer);
-composer.addPass(new THREE.RenderPass(scene, camera));
+const renderPass = new THREE.RenderPass(scene, camera);
+composer.addPass(renderPass);
+
 const bloomPass = new THREE.UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.0,
-  0.4,
-  0.85
+  0.5,   // Stärke
+  0.1,   // Radius
+  0.3   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 1.5;
-bloomPass.radius = 0.5;
+bloomPass.strength = 0.5; // Glowy-Effekt
+bloomPass.radius = 0.2;
 composer.addPass(bloomPass);
+
+// GlitchPass erstellen, standardmäßig deaktiviert
 const glitchPass = new THREE.GlitchPass();
 glitchPass.enabled = false;
 composer.addPass(glitchPass);
 
-// === Tunnel-Grid Setup ===
+// === Tunnel-Effekt Setup ===
 
-// Wir definieren den Tunnel als Serie von "Slices" (LineSegments) entlang der Z-Achse.
-// Das Grid basiert auf einer Geometrie, die gespiegelte Diagonalen in jeder Zelle (außer im zentralen Loch) zeichnet.
-const numSlices = 30;
-const planeSpacing = 10;
-const speed = 16; // Einheiten pro Sekunde
-const tunnelSlices = [];
+// Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
+const numPlanes = 60;
+const planeSpacing =10;
+const speed = 24;
+const tunnelPlanes = [];
 
 /**
- * Erzeugt eine BufferGeometry, die für jede Zelle (außer im zentralen Loch)
- * beide diagonalen Linien (gespiegelt) zeichnet.
- *
- * @param {number} width Gesamtbreite des Grids
- * @param {number} height Gesamthöhe des Grids
- * @param {number} holeSize Seitenlänge des zentralen Lochs (Quadrat)
- * @param {number} cellsX Anzahl der Zellen in X-Richtung
- * @param {number} cellsY Anzahl der Zellen in Y-Richtung
- * @returns {THREE.BufferGeometry} Die erzeugte Geometrie
+ * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen quadratischen Loch.
+ * Die interne Triangulierung erzeugt diagonale Kanten, was dem Grid einen echten 3D-Look verleiht.
  */
-function createMirroredDiagonalsGeometry(width, height, holeSize, cellsX, cellsY) {
-  const positions = [];
-  const halfWidth = width / 2;
-  const halfHeight = height / 2;
-  const stepX = width / cellsX;
-  const stepY = height / cellsY;
-  
-  for (let i = 0; i < cellsX; i++) {
-    for (let j = 0; j < cellsY; j++) {
-      const x0 = -halfWidth + i * stepX;
-      const x1 = x0 + stepX;
-      const y0 = -halfHeight + j * stepY;
-      const y1 = y0 + stepY;
-      // Zentrum der Zelle
-      const cx = (x0 + x1) / 2;
-      const cy = (y0 + y1) / 2;
-      // Überspringe Zellen im zentralen Loch (z. B. 20×20)
-      if (Math.abs(cx) < holeSize / 2 && Math.abs(cy) < holeSize / 2) continue;
-      
-      // Diagonale von oben links nach unten rechts
-      positions.push(x0, y1, 0, x1, y0, 0);
-      // Diagonale von oben rechts nach unten links
-      positions.push(x1, y1, 0, x0, y0, 0);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  return geometry;
+function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2, -height / 2);
+  shape.lineTo(width / 2, -height / 2);
+  shape.lineTo(width / 2, height / 2);
+  shape.lineTo(-width / 2, height / 2);
+  shape.lineTo(-width / 2, -height / 2);
+
+  const halfHole = holeSize / 8;
+  const holePath = new THREE.Path();
+  holePath.moveTo(-halfHole, -halfHole);
+  holePath.lineTo(halfHole, -halfHole);
+  holePath.lineTo(halfHole, halfHole);
+  holePath.lineTo(-halfHole, halfHole);
+  holePath.lineTo(-halfHole, -halfHole);
+  shape.holes.push(holePath);
+
+  return new THREE.ShapeGeometry(shape, segments);
 }
 
-// Erzeuge die Grid-Linien-Geometrie: 50×50 Fläche, 20×20 zentrales Loch, 10×10 Zellen
-const gridLinesGeometry = createMirroredDiagonalsGeometry(50, 50, 20, 10, 10);
-// Material für das Grid (Neon-Grün)
-const gridLineMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 1 });
+// Erzeuge Geometrie: 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
+const gridGeometry = createGridWithSquareHoleGeometry(30, 30, 20, 20);
 
-// Erzeuge Tunnel-Slices als LineSegments und positioniere sie entlang der Z-Achse
-for (let i = 0; i < numSlices; i++) {
-  const slice = new THREE.LineSegments(gridLinesGeometry, gridLineMaterial.clone());
-  slice.position.z = -i * planeSpacing;
-  tunnelSlices.push(slice);
-  scene.add(slice);
+// Material: Ursprünglich im Wireframe-Modus (Neon-Grün)
+function createGridMaterial() {
+  return new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 }
 
-// === Animationsloop ===
+// Erzeuge und positioniere Tunnel-Slices entlang der Z-Achse.
+for (let i = 0; i < numPlanes; i++) {
+  const material = createGridMaterial();
+  const gridMesh = new THREE.Mesh(gridGeometry, material);
+  gridMesh.position.z = -i * planeSpacing;
+  tunnelPlanes.push(gridMesh);
+  scene.add(gridMesh);
+}
 
+// Clock zur Messung des Delta Time
 const clock = new THREE.Clock();
+
+// Animationsloop: Zeitbasierte Bewegung
 function animate() {
   requestAnimationFrame(animate);
-  const delta = clock.getDelta();
-  tunnelSlices.forEach(slice => {
-    slice.position.z += speed * delta;
-    if (slice.position.z > camera.position.z + planeSpacing / 2) {
-      slice.position.z -= numSlices * planeSpacing;
+  const delta = clock.getDelta(); // Sekunden seit letztem Frame
+
+  tunnelPlanes.forEach(mesh => {
+    mesh.position.z += speed * delta;
+    if (mesh.position.z > camera.position.z + planeSpacing / 2) {
+      mesh.position.z -= numPlanes * planeSpacing;
     }
   });
+  
   composer.render();
 }
 animate();
@@ -132,12 +128,12 @@ async function setupRNBO() {
     return;
   }
   
+  // Optionale Abhängigkeiten laden, falls benötigt...
+  let dependencies = [];
   try {
-    await fetch("export/dependencies.json")
-      .then(r => r.json())
-      .then(deps => {
-        // Abhängigkeiten werden hier geladen, falls nötig.
-      });
+    const dependenciesResponse = await fetch("export/dependencies.json");
+    dependencies = await dependenciesResponse.json();
+    dependencies = dependencies.map(d => d.file ? { ...d, file: "export/" + d.file } : d);
   } catch (e) { }
   
   let device;
@@ -151,6 +147,7 @@ async function setupRNBO() {
   device.node.connect(outputNode);
   attachOutports(device);
   
+  // Resume AudioContext bei Nutzerinteraktion
   document.body.onclick = () => context.resume();
 }
 setupRNBO();
@@ -170,33 +167,49 @@ function loadRNBOScript(version) {
   });
 }
 
-// === RNBO Outport-Listener ===
-//
-// Beim Outport "grider" wird ein zufällig ausgewählter Tunnel-Slice für 100 ms mit einem dicken Outline-Überzug versehen.
-// Der Outline-Effekt wird direkt (ohne dynamische Skalierung) hinzugefügt, sodass das normale Tunnel-Grid nicht verändert wird.
+// RNBO Outport-Listener: reagiert auf "grider" und "glitchy"
 function attachOutports(device) {
   device.messageEvent.subscribe((ev) => {
     if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
       const randomIndex = Math.floor(Math.random() * tunnelSlices.length);
       const randomSlice = tunnelSlices[randomIndex];
-      // Erzeuge eine zusätzliche Outline als EdgesGeometry
+      
+      // Erzeuge aus der vorhandenen Grid-Geometrie eine EdgesGeometry für den Outline-Effekt
       const edges = new THREE.EdgesGeometry(gridLinesGeometry);
-      const thickMaterial = new THREE.LineBasicMaterial({
+      const lineMaterial = new THREE.LineBasicMaterial({
         color: 0x00ff82,       // Neon-Grün (ca. RGB 0,255,130)
-        linewidth: 40,         // Hinweis: lineWidth wird in vielen Browsern ignoriert.
+        linewidth: 40,         // Hinweis: linewidth wird in vielen Browsern ignoriert.
         transparent: true,
         opacity: 0.65,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
       });
-      const thickOutline = new THREE.LineSegments(edges, thickMaterial);
-      // Setze eine konstante Skalierung (keine Animation), sodass der Effekt sofort fett erscheint.
-      thickOutline.scale.set(1, 1, 1);
+      const thickOutline = new THREE.LineSegments(edges, lineMaterial);
+      // Starte mit einer kleinen Skalierung, sodass der Effekt zunächst dünn wirkt.
+      thickOutline.scale.set(0.5, 0.5, 0.5);
       randomSlice.add(thickOutline);
-      setTimeout(() => {
-        randomSlice.remove(thickOutline);
-      }, 100);
+      
+      // Animation: Skaliere den Outline von 0.5 auf 1.5 über 100 ms
+      const initialScale = 0.2;
+      const finalScale = 5;
+      const animationDuration = 1500; // in Millisekunden
+      const startTime = performance.now();
+      function animateOutline() {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / animationDuration, 1);
+        const newScale = initialScale + progress * (finalScale - initialScale);
+        thickOutline.scale.set(newScale, newScale, newScale);
+        if (progress < 1) {
+          requestAnimationFrame(animateOutline);
+        } else {
+          // Nach Erreichen des vollen Effekts, entferne ihn nach einer kurzen Pause (z. B. 100 ms)
+          setTimeout(() => {
+            randomSlice.remove(thickOutline);
+          }, 1500);
+        }
+      }
+      animateOutline();
     }
     
     if (ev.tag === "glitchy") {
@@ -206,3 +219,4 @@ function attachOutports(device) {
     console.log(`${ev.tag}: ${ev.payload}`);
   });
 }
+
