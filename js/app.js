@@ -1,97 +1,8 @@
-async function setup() {
-    const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
+// === Three.js + Post-Processing Setup ===
 
-    // Erstelle AudioContext
-    const WAContext = window.AudioContext || window.webkitAudioContext;
-    const context = new WAContext();
-
-    // Erstelle Gain-Node und verbinde ihn mit dem Audio-Ausgang
-    const outputNode = context.createGain();
-    outputNode.connect(context.destination);
-    
-    // Hole den exportierten RNBO-Patcher
-    let response, patcher;
-    try {
-        response = await fetch(patchExportURL);
-        patcher = await response.json();
-    
-        if (!window.RNBO) {
-            await loadRNBOScript(patcher.desc.meta.rnboversion);
-        }
-    } catch (err) {
-        const errorContext = { error: err };
-        if (response && (response.status >= 300 || response.status < 200)) {
-            errorContext.header = "Couldn't load patcher export bundle";
-            errorContext.description = "Check app.js to see what file it's trying to load. Currently it's " +
-             "trying to load \"" + patchExportURL + "\". If that doesn't " +
-             "match the name of the file you exported from RNBO, modify " +
-             "patchExportURL in app.js.";
-        }
-        if (typeof guardrails === "function") {
-            guardrails(errorContext);
-        } else {
-            throw err;
-        }
-        return;
-    }
-    
-    // (Optional) Abhängigkeiten laden, falls benötigt
-    let dependencies = [];
-    try {
-        const dependenciesResponse = await fetch("export/dependencies.json");
-        dependencies = await dependenciesResponse.json();
-        dependencies = dependencies.map(d => d.file ? { ...d, file: "export/" + d.file } : d);
-    } catch (e) {}
-
-    // Erstelle das RNBO-Gerät
-    let device;
-    try {
-        device = await RNBO.createDevice({ context, patcher });
-    } catch (err) {
-        if (typeof guardrails === "function") {
-            guardrails({ error: err });
-        } else {
-            throw err;
-        }
-        return;
-    }
-
-    device.node.connect(outputNode);
-
-    // Initialisiere die Three.js-Szene im "future retro" Look
-    initScene();
-
-    // Abonniere RNBO-Nachrichten und steuere die 3D-Objekte
-    attachOutports(device);
-
-    document.body.onclick = () => {
-        context.resume();
-    };
-
-    if (typeof guardrails === "function")
-        guardrails();
-}
-
-function loadRNBOScript(version) {
-    return new Promise((resolve, reject) => {
-        if (/^\d+\.\d+\.\d+-dev$/.test(version)) {
-            throw new Error("Patcher exported with a Debug Version!\nPlease specify the correct RNBO version to use in the code.");
-        }
-        const el = document.createElement("script");
-        el.src = "https://c74-public.nyc3.digitaloceanspaces.com/rnbo/" + encodeURIComponent(version) + "/rnbo.min.js";
-        el.onload = resolve;
-        el.onerror = function(err) {
-            console.log(err);
-            reject(new Error("Failed to load rnbo.js v" + version));
-        };
-        document.body.append(el);
-    });
-}
-
-// Basis-Setup der Three.js-Szene
+// Szene und Kamera
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000); // Schwarzer Hintergrund
-
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
@@ -100,44 +11,37 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.z = 5;
 
+// Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 const container = document.getElementById("threejs-container") || document.body;
 container.appendChild(renderer.domElement);
 
-// Post-Processing: EffektComposer mit UnrealBloomPass für den Glow-Effekt
+// Effekt Composer für den Glow-Effekt
 const composer = new THREE.EffectComposer(renderer);
 const renderPass = new THREE.RenderPass(scene, camera);
 composer.addPass(renderPass);
-
 const bloomPass = new THREE.UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.0,   // Stärke des Bloom-Effekts
+  1.0,   // Stärke
   0.4,   // Radius
   0.85   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 1.5; // Erhöht den glowy Effekt
+bloomPass.strength = 1.5; // Glowy-Effekt
 bloomPass.radius = 0.5;
 composer.addPass(bloomPass);
 
-// Parameter für den Tunnel
-const numPlanes = 45;      // Anzahl der Tunnel-Slices
-const planeSpacing = 10;   // Abstand zwischen den Slices
-const speed = 16;           // Bewegungsgeschwindigkeit in Einheiten pro Sekunde
+// === Tunnel-Effekt Setup ===
 
+// Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16)
+const numPlanes = 30;
+const planeSpacing = 10;
+const speed = 16;
 const tunnelPlanes = [];
 
-/**
- * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen quadratischen Loch.
- * Durch die interne Triangulierung entstehen auch diagonale Kanten, die der Geometrie einen echten 3D-Look verleihen.
- *
- * @param {number} width Gesamtbreite des Grids
- * @param {number} height Gesamthöhe des Grids
- * @param {number} holeSize Seitenlänge des quadratischen Lochs in der Mitte
- * @param {number} segments Detailgrad der Triangulierung
- * @returns {THREE.ShapeGeometry} Die erzeugte Geometrie
- */
+// Erzeugt ein Grid mit einem quadratischen Loch in der Mitte.
+// Durch die interne Triangulierung der ShapeGeometry entstehen auch diagonale Linien.
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   const shape = new THREE.Shape();
   shape.moveTo(-width / 2, -height / 2);
@@ -158,26 +62,31 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   return new THREE.ShapeGeometry(shape, segments);
 }
 
-// Erzeuge die Grid-Geometrie: Größe 50x50, Loch 20x20, feine Unterteilung (segments = 20)
+// Erzeuge Geometrie (Größe 50x50, zentrales Loch 20x20, feine Unterteilung)
 const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
-const gridMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 
-// Erzeuge die Tunnel-Slices und ordne sie entlang der Z-Achse an
+// Für jeden Tunnel-Slice erzeugen wir ein eigenes Material, damit wir einzelne Slices individuell verändern können.
+function createGridMaterial() {
+  return new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+}
+
+// Erzeuge und positioniere die Tunnel-Slices entlang der z-Achse.
 for (let i = 0; i < numPlanes; i++) {
-  const gridMesh = new THREE.Mesh(gridGeometry, gridMaterial);
+  const material = createGridMaterial();
+  const gridMesh = new THREE.Mesh(gridGeometry, material);
   gridMesh.position.z = -i * planeSpacing;
   tunnelPlanes.push(gridMesh);
   scene.add(gridMesh);
 }
 
-// Erstelle eine Clock, um Delta Time zu messen
+// Erstelle eine Clock, um Delta Time (Zeitdifferenz) zu messen.
 const clock = new THREE.Clock();
 
+// Animationsloop: Zeitbasierte Bewegung
 function animate() {
   requestAnimationFrame(animate);
-  const delta = clock.getDelta(); // Zeit in Sekunden seit dem letzten Frame
-  
-  // Aktualisiere die Position der Tunnel-Slices basierend auf der verstrichenen Zeit
+  const delta = clock.getDelta(); // Sekunden seit letztem Frame
+
   tunnelPlanes.forEach(mesh => {
     mesh.position.z += speed * delta;
     if (mesh.position.z > camera.position.z + planeSpacing / 2) {
@@ -187,7 +96,87 @@ function animate() {
   
   composer.render();
 }
-
 animate();
 
-setup();
+// === RNBO Integration ===
+
+async function setupRNBO() {
+  const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
+  const WAContext = window.AudioContext || window.webkitAudioContext;
+  const context = new WAContext();
+  const outputNode = context.createGain();
+  outputNode.connect(context.destination);
+  
+  let response, patcher;
+  try {
+    response = await fetch(patchExportURL);
+    patcher = await response.json();
+    if (!window.RNBO) {
+      await loadRNBOScript(patcher.desc.meta.rnboversion);
+    }
+  } catch (err) {
+    console.error("Fehler beim Laden des RNBO-Patchers:", err);
+    return;
+  }
+  
+  // (Optional) Abhängigkeiten laden, falls benötigt...
+  let dependencies = [];
+  try {
+    const dependenciesResponse = await fetch("export/dependencies.json");
+    dependencies = await dependenciesResponse.json();
+    dependencies = dependencies.map(d => d.file ? { ...d, file: "export/" + d.file } : d);
+  } catch (e) { }
+  
+  let device;
+  try {
+    device = await RNBO.createDevice({ context, patcher });
+  } catch (err) {
+    console.error("Fehler beim Erstellen des RNBO-Geräts:", err);
+    return;
+  }
+  
+  device.node.connect(outputNode);
+  attachOutports(device);
+  
+  // Resume AudioContext bei einer Nutzerinteraktion
+  document.body.onclick = () => context.resume();
+}
+setupRNBO();
+
+function loadRNBOScript(version) {
+  return new Promise((resolve, reject) => {
+    if (/^\d+\.\d+\.\d+-dev$/.test(version)) {
+      throw new Error("Patcher exported with a Debug Version! Bitte gib die korrekte RNBO-Version an.");
+    }
+    const el = document.createElement("script");
+    el.src = "https://c74-public.nyc3.digitaloceanspaces.com/rnbo/" + encodeURIComponent(version) + "/rnbo.min.js";
+    el.onload = resolve;
+    el.onerror = function(err) {
+      reject(new Error("Fehler beim Laden von rnbo.js v" + version));
+    };
+    document.body.appendChild(el);
+  });
+}
+
+// RNBO Outport-Listener: reagiert auch auf den Outport "grider"
+function attachOutports(device) {
+  device.messageEvent.subscribe((ev) => {
+    // Wenn der Outport "grider" 1 sendet, soll zufällig ein Tunnel-Slice aufleuchten.
+    if (ev.tag === "grider") {
+      if (parseInt(ev.payload) === 1) {
+        const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
+        const randomMesh = tunnelPlanes[randomIndex];
+        // Speichere die Originalfarbe des Materials
+        const originalColor = randomMesh.material.color.getHex();
+        // Setze die Farbe auf hellgelb (z. B. 0xffff00) – "aufleuchten"
+        randomMesh.material.color.set(0xffff00);
+        // Nach 300 Millisekunden wieder auf die Originalfarbe zurücksetzen
+        setTimeout(() => {
+          randomMesh.material.color.set(originalColor);
+        }, 300);
+      }
+    }
+    // Debug-Ausgabe
+    console.log(`${ev.tag}: ${ev.payload}`);
+  });
+}
