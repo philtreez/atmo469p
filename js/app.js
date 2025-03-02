@@ -105,91 +105,71 @@ const container = document.getElementById("threejs-container") || document.body;
 container.appendChild(renderer.domElement);
 
 // Parameter für den Tunnel
-const numPlanes = 30;      // Anzahl der Tunnel-Schnitte
-const planeSpacing = 10;   // Abstand zwischen den Schnitten
+const numPlanes = 30;      // Anzahl der Tunnel-Slices
+const planeSpacing = 10;   // Abstand zwischen den Slices
 const speed = 0.2;         // Bewegungsgeschwindigkeit
 
-// Array, in dem die Tunnel-Schnitte gespeichert werden
+// Array, in dem die Tunnel-Slices gespeichert werden
 const tunnelPlanes = [];
 
 /**
- * Erzeugt ein Linien-Grid, bestehend aus horizontalen und vertikalen Linien,
- * mit einem zentralen quadratischen Loch (ohne diagonale Linien).
+ * Erzeugt ein Grid als Shape-Geometrie mit einem quadratischen Loch in der Mitte.
+ * Durch die interne Triangulierung von ShapeGeometry entstehen auch diagonale Linien,
+ * die der Geometrie einen realistischen 3D-Look verleihen.
  *
  * @param {number} width Gesamtbreite des Grids
  * @param {number} height Gesamthöhe des Grids
  * @param {number} holeSize Seitenlänge des quadratischen Lochs in der Mitte
- * @param {number} divisionsX Anzahl der vertikalen Teilungen
- * @param {number} divisionsY Anzahl der horizontalen Teilungen
- * @returns {THREE.BufferGeometry} BufferGeometry mit den berechneten Linien
+ * @param {number} segments Detailgrad der Triangulierung
+ * @returns {THREE.ShapeGeometry} Die erzeugte Geometrie
  */
-function createGridWithSquareHoleLines(width, height, holeSize, divisionsX, divisionsY) {
-  const positions = [];
-  
-  // Vertikale Linien
-  for (let i = 0; i < divisionsX; i++) {
-    const x = -width / 2 + (width / (divisionsX - 1)) * i;
-    // Liegt diese Linie innerhalb des Loch-Bereichs?
-    if (Math.abs(x) < holeSize / 2) {
-      // Erzeuge zwei separate Linien: von unten bis zum Loch und von oberhalb des Lochs bis nach oben
-      positions.push(x, -height / 2, 0);
-      positions.push(x, -holeSize / 2, 0);
-      positions.push(x, holeSize / 2, 0);
-      positions.push(x, height / 2, 0);
-    } else {
-      // Eine einzelne Linie von unten bis oben
-      positions.push(x, -height / 2, 0);
-      positions.push(x, height / 2, 0);
-    }
-  }
-  
-  // Horizontale Linien
-  for (let j = 0; j < divisionsY; j++) {
-    const y = -height / 2 + (height / (divisionsY - 1)) * j;
-    if (Math.abs(y) < holeSize / 2) {
-      // Zwei separate Linien: von links bis zum Loch und von rechts des Lochs bis ganz rechts
-      positions.push(-width / 2, y, 0);
-      positions.push(-holeSize / 2, y, 0);
-      positions.push(holeSize / 2, y, 0);
-      positions.push(width / 2, y, 0);
-    } else {
-      // Eine einzelne Linie von links nach rechts
-      positions.push(-width / 2, y, 0);
-      positions.push(width / 2, y, 0);
-    }
-  }
-  
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2, -height / 2);
+  shape.lineTo(width / 2, -height / 2);
+  shape.lineTo(width / 2, height / 2);
+  shape.lineTo(-width / 2, height / 2);
+  shape.lineTo(-width / 2, -height / 2);
+
+  const halfHole = holeSize / 2;
+  const holePath = new THREE.Path();
+  holePath.moveTo(-halfHole, -halfHole);
+  holePath.lineTo(halfHole, -halfHole);
+  holePath.lineTo(halfHole, halfHole);
+  holePath.lineTo(-halfHole, halfHole);
+  holePath.lineTo(-halfHole, -halfHole);
+  shape.holes.push(holePath);
+
+  // Der segments-Parameter steuert, wie fein das Grid unterteilt wird – mehr Segmente = mehr diagonale Linien
+  const geometry = new THREE.ShapeGeometry(shape, segments);
   return geometry;
 }
 
-// Erzeuge die Grid-Geometrie: Gesamtgröße 50x50, Lochgröße 20, 10 Teilungen in X und Y
-const gridGeometry = createGridWithSquareHoleLines(50, 50, 20, 10, 10);
-const gridMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff }); // Neon-Magenta, typischer 80s Look
+// Erzeuge die Grid-Geometrie (Größe 50x50, Loch 20x20, feine Unterteilung)
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
+const gridMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true });
 
-// Erzeuge numPlanes Tunnel-Schnitte, alle mit dem gleichen Linien-Grid
+// Erzeuge die Tunnel-Slices und ordne sie entlang der Z-Achse an
 for (let i = 0; i < numPlanes; i++) {
-  const grid = new THREE.LineSegments(gridGeometry, gridMaterial);
-  grid.position.z = -i * planeSpacing;
-  tunnelPlanes.push(grid);
-  scene.add(grid);
+  const gridMesh = new THREE.Mesh(gridGeometry, gridMaterial);
+  gridMesh.position.z = -i * planeSpacing;
+  tunnelPlanes.push(gridMesh);
+  scene.add(gridMesh);
 }
 
-// Animationsloop: Verschiebt die Tunnel-Schnitte in Richtung der Kamera
+// Animationsloop: Bewegt die Tunnel-Slices in Richtung der Kamera,
+// sodass ein endloser Tunnel-Effekt entsteht.
 function animate() {
   requestAnimationFrame(animate);
-  tunnelPlanes.forEach(plane => {
-    plane.position.z += speed;
-    // Wird ein Schnitt vor die Kamera verschoben, setze ihn wieder ans Ende des Tunnels
-    if (plane.position.z > camera.position.z + planeSpacing / 2) {
-      plane.position.z -= numPlanes * planeSpacing;
+  tunnelPlanes.forEach(mesh => {
+    mesh.position.z += speed;
+    if (mesh.position.z > camera.position.z + planeSpacing / 2) {
+      mesh.position.z -= numPlanes * planeSpacing;
     }
   });
   renderer.render(scene, camera);
 }
 
 animate();
-
 
 setup();
