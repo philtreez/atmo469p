@@ -91,10 +91,13 @@ for (let i = 0; i < numPlanes; i++) {
 // Clock zur Messung des Delta Time
 const clock = new THREE.Clock();
 
-// Animationsloop: Zeitbasierte Bewegung
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta(); // Sekunden seit letztem Frame
+
+  // Kamera-Effekt: leichte horizontale Bewegung und Rotation
+  camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
+  camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
 
   tunnelPlanes.forEach(mesh => {
     mesh.position.z += speed * delta;
@@ -106,6 +109,7 @@ function animate() {
   composer.render();
 }
 animate();
+
 
 // === RNBO Integration ===
 
