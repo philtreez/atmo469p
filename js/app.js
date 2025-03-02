@@ -30,7 +30,7 @@ const bloomPass = new THREE.UnrealBloomPass(
   0.85   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 1.5; // Glowy-Effekt
+bloomPass.strength = 1; // Glowy-Effekt
 bloomPass.radius = 0.5;
 composer.addPass(bloomPass);
 
@@ -42,7 +42,7 @@ composer.addPass(glitchPass);
 // === Tunnel-Effekt Setup ===
 
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
-const numPlanes = 90;
+const numPlanes = 15;
 const planeSpacing = 5;
 const speed = 16;
 const tunnelPlanes = [];
