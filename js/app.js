@@ -181,14 +181,14 @@ function attachOutports(device) {
         color: 0x00ff82,       // Neon-Grün (ca. RGB 0,255,130)
         linewidth: 100,         // Hinweis: lineWidth wird in vielen Browsern ignoriert.
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.4,
         blending: THREE.AdditiveBlending,
         depthTest: false,
         depthWrite: false
       });
       const thickOutline = new THREE.LineSegments(edges, lineMaterial);
       // SKALIEREN: Mache den Outline-Effekt kleiner, sodass mehr Grid sichtbar bleibt.
-      thickOutline.scale.set(1, 1, 1);
+      thickOutline.scale.set(0.5, 0.5, 0.5);
       randomMesh.add(thickOutline);
       setTimeout(() => {
         randomMesh.remove(thickOutline);
