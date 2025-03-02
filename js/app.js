@@ -71,7 +71,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 }
 
 // Erzeuge Geometrie: Größe 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
-const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 25, 25);
 
 // Für jeden Tunnel-Slice erzeugen wir ein eigenes Material – zunächst im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
