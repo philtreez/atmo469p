@@ -105,7 +105,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 const container = document.getElementById("threejs-container") || document.body;
 container.appendChild(renderer.domElement);
 
-// Post-Processing: EffektComposer mit UnrealBloomPass für den Glow
+// Post-Processing: EffektComposer mit UnrealBloomPass für den Glow-Effekt
 const composer = new THREE.EffectComposer(renderer);
 const renderPass = new THREE.RenderPass(scene, camera);
 composer.addPass(renderPass);
@@ -117,19 +117,20 @@ const bloomPass = new THREE.UnrealBloomPass(
   0.85   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 1.5; // Erhöht den Glowy-Effekt
+bloomPass.strength = 1.5; // Erhöht den glowy Effekt
 bloomPass.radius = 0.5;
 composer.addPass(bloomPass);
 
 // Parameter für den Tunnel
 const numPlanes = 30;      // Anzahl der Tunnel-Slices
 const planeSpacing = 10;   // Abstand zwischen den Slices
-const speed = 0.2;         // Bewegungsgeschwindigkeit
+const speed = 2;           // Bewegungsgeschwindigkeit in Einheiten pro Sekunde
+
 const tunnelPlanes = [];
 
 /**
  * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen quadratischen Loch.
- * Die interne Triangulierung erzeugt diagonale Kanten, die der Szene einen 3D-Look verleihen.
+ * Durch die interne Triangulierung entstehen auch diagonale Kanten, die der Geometrie einen echten 3D-Look verleihen.
  *
  * @param {number} width Gesamtbreite des Grids
  * @param {number} height Gesamthöhe des Grids
@@ -159,11 +160,9 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 
 // Erzeuge die Grid-Geometrie: Größe 50x50, Loch 20x20, feine Unterteilung (segments = 20)
 const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
-
-// Material: Neon-Grün (0x00ff00) im Wireframe-Modus
 const gridMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 
-// Erzeuge Tunnel-Slices und positioniere sie entlang der z-Achse
+// Erzeuge die Tunnel-Slices und ordne sie entlang der Z-Achse an
 for (let i = 0; i < numPlanes; i++) {
   const gridMesh = new THREE.Mesh(gridGeometry, gridMaterial);
   gridMesh.position.z = -i * planeSpacing;
@@ -171,15 +170,21 @@ for (let i = 0; i < numPlanes; i++) {
   scene.add(gridMesh);
 }
 
-// Animationsloop: Bewegt die Tunnel-Slices in Richtung der Kamera und erzeugt einen endlosen Tunnel-Effekt
+// Erstelle eine Clock, um Delta Time zu messen
+const clock = new THREE.Clock();
+
 function animate() {
   requestAnimationFrame(animate);
+  const delta = clock.getDelta(); // Zeit in Sekunden seit dem letzten Frame
+  
+  // Aktualisiere die Position der Tunnel-Slices basierend auf der verstrichenen Zeit
   tunnelPlanes.forEach(mesh => {
-    mesh.position.z += speed;
+    mesh.position.z += speed * delta;
     if (mesh.position.z > camera.position.z + planeSpacing / 2) {
       mesh.position.z -= numPlanes * planeSpacing;
     }
   });
+  
   composer.render();
 }
 
