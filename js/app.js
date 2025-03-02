@@ -124,7 +124,7 @@ composer.addPass(bloomPass);
 // Parameter für den Tunnel
 const numPlanes = 30;      // Anzahl der Tunnel-Slices
 const planeSpacing = 10;   // Abstand zwischen den Slices
-const speed = 2;           // Bewegungsgeschwindigkeit in Einheiten pro Sekunde
+const speed = 4;           // Bewegungsgeschwindigkeit in Einheiten pro Sekunde
 
 const tunnelPlanes = [];
 
