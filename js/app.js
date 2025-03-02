@@ -26,7 +26,7 @@ composer.addPass(renderPass);
 const bloomPass = new THREE.UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
   0.5,   // Stärke
-  0.2,   // Radius
+  0.1,   // Radius
   0.3   // Schwellenwert
 );
 bloomPass.threshold = 0;
@@ -72,7 +72,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
 }
 
 // Erzeuge Geometrie: 50x50, zentrales Loch 20x20, feine Unterteilung (segments = 20)
-const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 5, 5);
+const gridGeometry = createGridWithSquareHoleGeometry(50, 50, 25, 25);
 
 // Material: Ursprünglich im Wireframe-Modus (Neon-Grün)
 function createGridMaterial() {
