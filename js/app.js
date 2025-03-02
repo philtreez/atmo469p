@@ -177,7 +177,7 @@ function attachOutports(device) {
       const edges = new THREE.EdgesGeometry(randomMesh.geometry);
       const lineMaterial = new THREE.LineBasicMaterial({
         color: 0x00ff82, // Neon-Grün (0x00ff82 entspricht ca. RGB(0,255,130))
-        linewidth: 40,   // Hinweis: lineWidth wird in vielen Browsern ignoriert
+        linewidth: 100,   // Hinweis: lineWidth wird in vielen Browsern ignoriert
         transparent: true,
         opacity: 0.65,
         blending: THREE.AdditiveBlending,
