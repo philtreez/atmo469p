@@ -112,8 +112,8 @@ const speed = 0.2;         // Bewegungsgeschwindigkeit
 // Array, in dem die einzelnen Tunnel-Platten gespeichert werden
 const tunnelPlanes = [];
 
-// Funktion, die ein Gitter mit Loch in der Mitte erstellt
-function createGridWithHoleGeometry(width, height, holeRadius, segments) {
+// Funktion, die ein Gitter mit einem quadratischen Loch in der Mitte erstellt
+function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   // Erzeuge ein Shape, das ein Rechteck darstellt
   const shape = new THREE.Shape();
   shape.moveTo(-width / 2, -height / 2);
@@ -122,9 +122,14 @@ function createGridWithHoleGeometry(width, height, holeRadius, segments) {
   shape.lineTo(-width / 2, height / 2);
   shape.lineTo(-width / 2, -height / 2);
 
-  // Füge ein Loch (hier rund) hinzu
+  // Füge ein quadratisches Loch hinzu
+  const halfHole = holeSize / 2;
   const holePath = new THREE.Path();
-  holePath.absarc(0, 0, holeRadius, 0, Math.PI * 2, true);
+  holePath.moveTo(-halfHole, -halfHole);
+  holePath.lineTo(halfHole, -halfHole);
+  holePath.lineTo(halfHole, halfHole);
+  holePath.lineTo(-halfHole, halfHole);
+  holePath.lineTo(-halfHole, -halfHole);
   shape.holes.push(holePath);
 
   // Erzeuge die Geometrie aus dem Shape
@@ -132,12 +137,12 @@ function createGridWithHoleGeometry(width, height, holeRadius, segments) {
   return geometry;
 }
 
-// Erzeuge numPlanes Tunnel-Platten mit dem gewünschten Gitter-Look
+// Erzeuge numPlanes Tunnel-Platten mit dem gewünschten Grid-Look
 for (let i = 0; i < numPlanes; i++) {
-  // Erzeuge eine Fläche (50 x 50) mit einem Loch (Radius 10) in der Mitte.
-  const geometry = createGridWithHoleGeometry(50, 50, 10, 20);
+  // Erzeuge eine Fläche (50 x 50) mit einem quadratischen Loch (Seitenlänge 20) in der Mitte.
+  const geometry = createGridWithSquareHoleGeometry(50, 50, 20, 20);
   const material = new THREE.MeshBasicMaterial({
-    color: 0x00ffff, // Neon-Türkis, typisch für 80er-Jahre
+    color: 0xff00ff, // Neon-Magenta für den typischen 80s-Look
     wireframe: true
   });
   const mesh = new THREE.Mesh(geometry, material);
@@ -147,7 +152,7 @@ for (let i = 0; i < numPlanes; i++) {
   scene.add(mesh);
 }
 
-// Animationsloop: Verschiebt die Platten, sodass sie an der Kamera vorbeiziehen und so einen Tunnel-Effekt erzeugen
+// Animationsloop: Verschiebt die Platten, sodass sie an der Kamera vorbeiziehen und einen Tunnel-Effekt erzeugen
 function animate() {
   requestAnimationFrame(animate);
   tunnelPlanes.forEach(plane => {
