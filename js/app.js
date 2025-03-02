@@ -23,13 +23,13 @@ const renderPass = new THREE.RenderPass(scene, camera);
 composer.addPass(renderPass);
 const bloomPass = new THREE.UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.0,   // Stärke
+  0.75,   // Stärke
   0.4,   // Radius
   0.55   // Schwellenwert
 );
 bloomPass.threshold = 0;
 bloomPass.strength = 1; // Glowy-Effekt
-bloomPass.radius = 0.5;
+bloomPass.radius = 0.2;
 composer.addPass(bloomPass);
 
 // === Tunnel-Effekt Setup ===
