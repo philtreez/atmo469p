@@ -44,7 +44,7 @@ composer.addPass(glitchPass);
 // Parameter: 30 Tunnel-Slices, 10 Einheiten Abstand, speed in Einheiten pro Sekunde (hier 16, anpassbar an BPM)
 const numPlanes = 60;
 const planeSpacing =10;
-const speed = 2;
+const speed = 24;
 const tunnelPlanes = [];
 
 /**
@@ -98,7 +98,7 @@ function animate() {
 
   tunnelPlanes.forEach(mesh => {
     mesh.position.z += speed * delta;
-    if (mesh.position.z > camera.position.z + planeSpacing / 4) {
+    if (mesh.position.z > camera.position.z + planeSpacing / 2) {
       mesh.position.z -= numPlanes * planeSpacing;
     }
   });
