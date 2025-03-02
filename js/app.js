@@ -88,96 +88,63 @@ function loadRNBOScript(version) {
     });
 }
 
-// Globale Variablen für Three.js
-let scene, camera, renderer, sceneObjects = {};
+/// Basis-Setup der Three.js-Szene
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000); // Schwarzer Hintergrund
 
-// Erstelle eine Szene mit Grid und verschiedenen wireframe-Objekten
-function initScene() {
-    // Szene und Hintergrund
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.z = 5;
 
-    // Kamera
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 40;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
 
-    // Renderer – der Canvas wird an den in Webflow angelegten Container angehängt
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    const container = document.getElementById("threejs-container");
-    container.appendChild(renderer.domElement);
+// Hänge den Renderer an einen Container in Webflow (z.B. mit der ID "threejs-container")
+const container = document.getElementById("threejs-container") || document.body;
+container.appendChild(renderer.domElement);
 
-    // Füge einen GridHelper hinzu – futuristischer Vector-Look
-    const gridHelper = new THREE.GridHelper(100, 20, 0x00ff00, 0x005500);
-    scene.add(gridHelper);
+// Parameter für den Tunnel
+const numPlanes = 30;       // Anzahl der Gitterplatten
+const planeSpacing = 10;    // Abstand zwischen den Platten
+const speed = 0.2;          // Geschwindigkeit der Bewegung
 
-    // Licht – schlichte Ambient- und Richtungslichter
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set(0, 1, 1);
-    scene.add(directionalLight);
+// Array, in dem die einzelnen Gitter-Platten gespeichert werden
+const tunnelPlanes = [];
 
-    // Definiere die Outport-Namen und erzeuge für jeden ein anderes 3D-Objekt
-    const outportNames = ["a", "t", "m", "o", "for", "six", "nine", "p"];
-    outportNames.forEach((name, index) => {
-        let geometry;
-        switch (name) {
-            case "a":
-                geometry = new THREE.BoxGeometry(4, 4, 4);
-                break;
-            case "t":
-                geometry = new THREE.SphereGeometry(3, 16, 16);
-                break;
-            case "m":
-                geometry = new THREE.ConeGeometry(3, 6, 8);
-                break;
-            case "o":
-                geometry = new THREE.CylinderGeometry(2.5, 2.5, 6, 16);
-                break;
-            case "for":
-                geometry = new THREE.TorusGeometry(3, 1, 16, 100);
-                break;
-            case "six":
-                geometry = new THREE.DodecahedronGeometry(3);
-                break;
-            case "nine":
-                geometry = new THREE.OctahedronGeometry(3);
-                break;
-            case "p":
-                geometry = new THREE.TetrahedronGeometry(3);
-                break;
-            default:
-                geometry = new THREE.BoxGeometry(3, 3, 3);
-        }
-        // Verwende ein MeshBasicMaterial im Wireframe-Modus für den Vektor-Look
-        const material = new THREE.MeshBasicMaterial({ 
-            color: Math.random() * 0xffffff, 
-            wireframe: true 
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        // Positioniere die Objekte kreisförmig um den Ursprung
-        const angle = (index / outportNames.length) * Math.PI * 2;
-        const radius = 20;
-        mesh.position.x = Math.cos(angle) * radius;
-        mesh.position.y = Math.sin(angle) * radius;
-        mesh.position.z = (Math.random() - 0.5) * 10;
-        scene.add(mesh);
-        sceneObjects[name] = mesh;
-    });
-
-    animate();
+// Erzeuge numPlanes Plane-Meshes mit Wireframe-Material
+for (let i = 0; i < numPlanes; i++) {
+  // Erzeuge ein Plane-Geometry mit Segmenten, damit das Wireframe einen Gitter-Look hat
+  const geometry = new THREE.PlaneGeometry(50, 50, 20, 20);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x00ffff, // Neon-Türkis, klassischer 80er Look
+    wireframe: true
+  });
+  const plane = new THREE.Mesh(geometry, material);
+  // Positioniere die Platte entlang der z-Achse
+  plane.position.z = -i * planeSpacing;
+  tunnelPlanes.push(plane);
+  scene.add(plane);
 }
 
-// Animationsloop: Rotiert die Objekte für einen dynamischen Effekt
+// Animationsloop: Bewegt die Platten in Richtung Kamera, um einen Tunnel-Effekt zu erzeugen
 function animate() {
-    requestAnimationFrame(animate);
-    Object.values(sceneObjects).forEach(obj => {
-        obj.rotation.x += 0.01;
-        obj.rotation.y += 0.01;
-    });
-    renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+  tunnelPlanes.forEach(plane => {
+    // Bewege die Platte nach vorne (Richtung der Kamera)
+    plane.position.z += speed;
+    // Wenn die Platte die Kamera passiert hat, setze sie ans Ende des Tunnels
+    if (plane.position.z > camera.position.z + planeSpacing / 2) {
+      plane.position.z -= numPlanes * planeSpacing;
+    }
+  });
+  renderer.render(scene, camera);
 }
+
+animate();
 
 // RNBO Outport-Listener: Steuert Eigenschaften der 3D-Objekte
 function attachOutports(device) {
