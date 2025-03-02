@@ -193,7 +193,7 @@ function attachOutports(device) {
       // Animation: Skaliere den Outline von 0.5 auf 1.5 über 100 ms
       const initialScale = 0.2;
       const finalScale = 5;
-      const animationDuration = 1500; // in Millisekunden
+      const animationDuration = 300; // in Millisekunden
       const startTime = performance.now();
       function animateOutline() {
         const elapsed = performance.now() - startTime;
