@@ -180,7 +180,6 @@ function attachOutports(device) {
       const lineMaterial = new THREE.LineBasicMaterial({
         color: 0x00ff82,       // Neon-Grün (ca. RGB 0,255,130)
         linewidth: 100,         // Hinweis: lineWidth wird in vielen Browsern ignoriert.
-        transparent: true,
         opacity: 0.4,
         blending: THREE.AdditiveBlending,
         depthTest: false,
