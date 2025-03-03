@@ -292,6 +292,87 @@ function attachRNBOMessages(device) {
   }
 }
 
+// --- Volume Slider Setup ---
+
+function setupVolumeSlider() {
+  const container = document.getElementById("slider-vol-container");
+  const thumb = document.getElementById("slider-vol-thumb");
+  if (!container || !thumb) {
+    console.warn("Volume slider elements not found.");
+    return;
+  }
+  
+  // Stelle sicher, dass der Container relativ positioniert ist,
+  // damit der Thumb absolut innerhalb positioniert werden kann.
+  container.style.position = "relative";
+  container.style.width = "180px";
+  container.style.height = "40px";
+  
+  // Thumb-Stile: absolut positioniert, initial ganz links
+  thumb.style.position = "absolute";
+  thumb.style.width = "40px";
+  thumb.style.height = "40px";
+  thumb.style.left = "0px"; // Startwert: 0 (links)
+  thumb.style.top = "0px";  // Optional: falls der Thumb vertikal mittig sein soll, kann hier noch angepasst werden
+  thumb.style.touchAction = "none"; // Für korrekte Touch-Interaktionen
+  
+  let isDragging = false;
+  let startX = 0;
+  let thumbStartLeft = 0;
+  const maxLeft = container.clientWidth - thumb.clientWidth; // 180 - 40 = 140 px
+  
+  thumb.addEventListener("pointerdown", (e) => {
+    isDragging = true;
+    startX = e.clientX;
+    thumbStartLeft = parseFloat(thumb.style.left);
+    thumb.setPointerCapture(e.pointerId);
+  });
+  
+  thumb.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    let newLeft = thumbStartLeft + dx;
+    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+    thumb.style.left = newLeft + "px";
+    // Berechne den normalisierten Wert (0-1)
+    const normalizedValue = newLeft / maxLeft;
+    sendParameter("vol", normalizedValue);
+  });
+  
+  thumb.addEventListener("pointerup", () => {
+    isDragging = false;
+  });
+  
+  thumb.addEventListener("pointercancel", () => {
+    isDragging = false;
+  });
+}
+
+// Aktualisiert den Thumb basierend auf einem RNBO-Wert (0-1)
+function updateVolumeSliderFromRNBO(value) {
+  const container = document.getElementById("slider-vol-container");
+  const thumb = document.getElementById("slider-vol-thumb");
+  if (!container || !thumb) return;
+  const maxLeft = container.clientWidth - thumb.clientWidth;
+  const newLeft = value * maxLeft;
+  thumb.style.left = newLeft + "px";
+}
+
+// Beispiel: Funktion zum Senden des Wertes an RNBO
+function sendParameter(tag, value) {
+  // Falls dein RNBO-Gerät eine Funktion sendMessage(tag, payload) hat:
+  if (window.rnboDevice && rnboDevice.sendMessage) {
+    rnboDevice.sendMessage(tag, value);
+  } else {
+    console.log("Parameter senden:", tag, value);
+  }
+}
+
+// Rufe setupVolumeSlider() auf, wenn das DOM geladen ist.
+document.addEventListener("DOMContentLoaded", () => {
+  setupVolumeSlider();
+});
+
 // Aufruf: Starte das Setup, wenn das DOM geladen ist.
 document.addEventListener("DOMContentLoaded", () => {
   setupRotarySliders();
