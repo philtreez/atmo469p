@@ -359,12 +359,12 @@ function updateVolumeSliderFromRNBO(value) {
 }
 
 // Beispiel: Funktion zum Senden des Wertes an RNBO
-function sendParameter(tag, value) {
+function sendParameter(id, value) {
   // Falls dein RNBO-Gerät eine Funktion sendMessage(tag, payload) hat:
   if (window.rnboDevice && rnboDevice.sendMessage) {
-    rnboDevice.sendMessage(tag, value);
+    rnboDevice.sendMessage(id, value);
   } else {
-    console.log("Parameter senden:", tag, value);
+    console.log("Parameter senden:", id, value);
   }
 }
 
