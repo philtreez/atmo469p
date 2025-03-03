@@ -198,36 +198,14 @@ function updateSliderFromRNBO(id, value) {
   }
 }
 
-function updateButtonFromRNBO(id, value) {
-  const button = document.getElementById(id);
-  if (button) {
-    button.dataset.value = value.toString();
-    // Hier steuern wir nur die Opacity, ohne Hintergrundfarbe zu setzen.
-    button.style.opacity = (parseInt(value) === 1) ? "1" : "0";
-  }
-}
-
-function updateLights(outport, value) {
-  const intVal = Math.round(parseFloat(value));
-  console.log(`Update Lights for ${outport}: ${intVal}`);
-  // Wenn der Wert 0 ist, sollen alle unsichtbar sein.
-  for (let i = 1; i <= 8; i++) {
-    const el = document.getElementById(`${outport}-${i}`);
-    if (el) {
-      el.style.opacity = (intVal === i) ? "1" : "0";
-    }
-  }
-}
-
 function attachRNBOMessages(device) {
-  const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "light1", "light2"];
+  // Nur Parameter, die als Parameter kommen, nicht die reinen Outport-Nachrichten:
+  const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"];
   if (device.parameterChangeEvent) {
     device.parameterChangeEvent.subscribe(param => {
       if (controlIds.includes(param.id)) {
         if (param.id.startsWith("b")) {
           updateButtonFromRNBO(param.id, parseFloat(param.value));
-        } else if (param.id.startsWith("light")) {
-          updateLights(param.id, param.value);
         } else {
           updateSliderFromRNBO(param.id, parseFloat(param.value));
         }
@@ -239,8 +217,6 @@ function attachRNBOMessages(device) {
       if (controlIds.includes(ev.tag)) {
         if (ev.tag.startsWith("b")) {
           updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
-        } else if (ev.tag.startsWith("light")) {
-          updateLights(ev.tag, ev.payload);
         } else {
           updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
         }
@@ -252,6 +228,7 @@ function attachRNBOMessages(device) {
 
 function attachOutports(device) {
   device.messageEvent.subscribe(ev => {
+    // Handle grider und glitchy wie bisher:
     if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
       const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
       const randomPlane = tunnelPlanes[randomIndex];
@@ -277,8 +254,26 @@ function attachOutports(device) {
       glitchPass.enabled = (parseInt(ev.payload) === 1);
     }
     
+    // Hier prüfen wir, ob der Outport für Light-Daten ist
+    if (ev.tag.startsWith("light1") || ev.tag.startsWith("light2")) {
+      // updateLights erwartet den Outport-Namen (z. B. "light1" oder "light2") und einen Wert (0-8)
+      updateLights(ev.tag, ev.payload);
+    }
+    
     console.log(`${ev.tag}: ${ev.payload}`);
   });
+}
+
+function updateLights(outport, value) {
+  const intVal = Math.round(parseFloat(value));
+  console.log(`Update Lights for ${outport}: ${intVal}`);
+  // Wenn der Wert 0 ist, sollen alle unsichtbar sein.
+  for (let i = 1; i <= 8; i++) {
+    const el = document.getElementById(`${outport}-${i}`);
+    if (el) {
+      el.style.opacity = (intVal === i) ? "1" : "0";
+    }
+  }
 }
 
 // ================= Rotary Slider Setup (IDs: slider-s1 ... slider-s8) =================
@@ -411,84 +406,6 @@ function updateButtonFromRNBO(id, value) {
     button.dataset.value = value.toString();
     button.style.opacity = (parseInt(value) === 1) ? "1" : "0";
   }
-}
-
-// ================= Light-Buttons Setup (IDs: light1-1 ... light1-8 und light2-1 ... light2-8) =================
-
-function updateLights(outport, value) {
-  const intVal = Math.round(parseFloat(value));
-  console.log(`Update Lights for ${outport}: ${intVal}`);
-  for (let i = 1; i <= 8; i++) {
-    const el = document.getElementById(`${outport}-${i}`);
-    if (el) {
-      // Bei 0 alle unsichtbar, ansonsten nur der entsprechende Button sichtbar
-      el.style.opacity = (intVal === 0) ? "0" : ((intVal === i) ? "1" : "0");
-    }
-  }
-}
-
-// ================= RNBO Steuerung: Nachrichten und Outports =================
-
-function attachRNBOMessages(device) {
-  const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "light1", "light2"];
-  if (device.parameterChangeEvent) {
-    device.parameterChangeEvent.subscribe(param => {
-      if (controlIds.includes(param.id)) {
-        if (param.id.startsWith("b")) {
-          updateButtonFromRNBO(param.id, parseFloat(param.value));
-        } else if (param.id.startsWith("light")) {
-          updateLights(param.id, param.value);
-        } else {
-          updateSliderFromRNBO(param.id, parseFloat(param.value));
-        }
-      }
-      console.log(`Parameter ${param.id} geändert: ${param.value}`);
-    });
-  } else if (device.messageEvent) {
-    device.messageEvent.subscribe(ev => {
-      if (controlIds.includes(ev.tag)) {
-        if (ev.tag.startsWith("b")) {
-          updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
-        } else if (ev.tag.startsWith("light")) {
-          updateLights(ev.tag, ev.payload);
-        } else {
-          updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
-        }
-      }
-      console.log(`Message ${ev.tag}: ${ev.payload}`);
-    });
-  }
-}
-
-function attachOutports(device) {
-  device.messageEvent.subscribe(ev => {
-    if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
-      const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
-      const randomPlane = tunnelPlanes[randomIndex];
-      const edges = new THREE.EdgesGeometry(gridGeometry);
-      const lineMaterial = new THREE.LineBasicMaterial({
-        color: 0x00ff82,
-        linewidth: 40,
-        transparent: true,
-        opacity: 0.65,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-        depthWrite: false
-      });
-      const thickOutline = new THREE.LineSegments(edges, lineMaterial);
-      thickOutline.scale.set(1, 1, 1);
-      randomPlane.add(thickOutline);
-      setTimeout(() => {
-        randomPlane.remove(thickOutline);
-      }, 100);
-    }
-    
-    if (ev.tag === "glitchy") {
-      glitchPass.enabled = (parseInt(ev.payload) === 1);
-    }
-    
-    console.log(`${ev.tag}: ${ev.payload}`);
-  });
 }
 
 // ================= DOMContentLoaded Aufrufe =================
