@@ -55,6 +55,8 @@ const material = new THREE.MeshBasicMaterial({
 const morphObject = new THREE.Mesh(geometry, material);
 scene.add(morphObject);
 
+const clock = new THREE.Clock();
+
 // ================= Animate Function =================
 
 function animate() {
