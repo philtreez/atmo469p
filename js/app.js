@@ -140,14 +140,6 @@ async function setupRNBO() {
     return;
   }
   
-  // Optionale Abhängigkeiten laden, falls benötigt...
-  let dependencies = [];
-  try {
-    const dependenciesResponse = await fetch("export/dependencies.json");
-    dependencies = await dependenciesResponse.json();
-    dependencies = dependencies.map(d => d.file ? { ...d, file: "export/" + d.file } : d);
-  } catch (e) { }
-  
   let device;
   try {
     device = await RNBO.createDevice({ context, patcher });
@@ -156,13 +148,16 @@ async function setupRNBO() {
     return;
   }
   
-  device.node.connect(outputNode);
-  attachOutports(device);
-  attachRNBOMessages(device);
+  // Gerät global verfügbar machen:
+  window.rnboDevice = device;
   
-  // Resume AudioContext bei Nutzerinteraktion
+  device.node.connect(outputNode);
+  attachRNBOMessages(device);
+  attachOutports(device);
+
   document.body.onclick = () => context.resume();
 }
+
 setupRNBO();
 
 function loadRNBOScript(version) {
