@@ -37,7 +37,7 @@ composer.addPass(glitchPass);
 
 // ================= Tunnel-Effekt Setup =================
 
-// Parameter: Anzahl Slices, Abstand, Geschwindigkeit
+// Parameter: 40 Slices, 5 Einheiten Abstand, Geschwindigkeit 24 Einheiten pro Sekunde
 const numPlanes = 40;
 const planeSpacing = 5;
 const speed = 24;
@@ -45,7 +45,6 @@ const tunnelPlanes = [];
 
 /**
  * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen, kleinen Loch.
- * (Hier wurde halfHole bewusst klein gesetzt, um einen typischen Tunnel-Look zu erzielen.)
  */
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   const shape = new THREE.Shape();
@@ -55,7 +54,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   shape.lineTo(-width / 2, height / 2);
   shape.lineTo(-width / 2, -height / 2);
 
-  // Hier wird das "Loch" als kleiner Bereich definiert (holeSize/8)
+  // Das "Loch" ist hier klein (holeSize/8)
   const halfHole = holeSize / 8;
   const holePath = new THREE.Path();
   holePath.moveTo(-halfHole, -halfHole);
@@ -68,7 +67,6 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   return new THREE.ShapeGeometry(shape, segments);
 }
 
-// Erzeuge Geometrie – hier z. B. 30×30 Fläche
 const gridGeometry = createGridWithSquareHoleGeometry(30, 30, 20, 20);
 
 function createGridMaterial() {
@@ -89,7 +87,7 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
 
-  // Optionale Kamera-Bewegung:
+  // Optionale Kamera-Bewegung
   camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
   camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
 
@@ -108,7 +106,10 @@ animate();
 
 // ================= RNBO Integration =================
 
+// Globales RNBO-Gerät; initial noch null
 window.rnboDevice = null;
+// Parameter-Queue: Wenn Slider vor RNBO-Setup Änderungen senden, werden diese hier zwischengespeichert.
+let parameterQueue = {};
 
 async function setupRNBO() {
   const patchExportURL = "https://atmo469p-philtreezs-projects.vercel.app/export/patch.export.json";
@@ -142,6 +143,9 @@ async function setupRNBO() {
   attachRNBOMessages(device);
   attachOutports(device);
   
+  // Sobald rnboDevice verfügbar ist, werden alle zwischengespeicherten Parameter gesendet.
+  flushParameterQueue();
+  
   document.body.onclick = () => context.resume();
 }
 
@@ -162,21 +166,34 @@ function loadRNBOScript(version) {
   });
 }
 
+// Sendet den Parameter; wenn rnboDevice nicht verfügbar ist, wird er in der Queue gespeichert.
 function sendParameter(id, value) {
   if (window.rnboDevice && rnboDevice.sendMessage) {
     rnboDevice.sendMessage(id, value);
     console.log(`Parameter ${id} gesetzt auf ${value}`);
   } else {
-    console.log("rnboDevice nicht verfügbar. Parameter:", id, value);
+    console.warn("rnboDevice nicht verfügbar. Parameter wird zwischengespeichert:", id, value);
+    parameterQueue[id] = value;
   }
 }
 
+// Sobald rnboDevice verfügbar ist, werden alle zwischengespeicherten Parameter gesendet.
+function flushParameterQueue() {
+  if (window.rnboDevice && rnboDevice.sendMessage) {
+    for (const [id, value] of Object.entries(parameterQueue)) {
+      rnboDevice.sendMessage(id, value);
+      console.log(`Zwischengespeicherter Parameter ${id} gesetzt auf ${value}`);
+    }
+    parameterQueue = {};
+  }
+}
+
+// Aktualisiert den Slider basierend auf einem RNBO-Wert (0-1)
 function updateSliderFromRNBO(id, value) {
   const slider = document.getElementById("slider-" + id);
   if (slider) {
     const rotation = value * 2 * Math.PI; // intern in Radiant
     slider.dataset.rotation = rotation;
-    // Visualisierung: 0-1 entspricht 0 bis 270° Drehung
     const degrees = rotation * (270 / (2 * Math.PI));
     slider.style.transform = `rotate(${degrees}deg)`;
   }
@@ -218,7 +235,7 @@ function attachOutports(device) {
         depthWrite: false
       });
       const thickOutline = new THREE.LineSegments(edges, lineMaterial);
-      thickOutline.scale.set(1, 1, 1); // Sofort in voller Größe
+      thickOutline.scale.set(1, 1, 1);
       randomPlane.add(thickOutline);
       setTimeout(() => {
         randomPlane.remove(thickOutline);
@@ -277,20 +294,14 @@ function setupRotarySliders() {
       const deltaAngle = angle - startAngle;
       const newRotation = initialRotation + deltaAngle;
       slider.dataset.rotation = newRotation;
-      // 0-1 entspricht 0 bis 270° Drehung
       const degrees = (((newRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI)) * (270 / (2 * Math.PI));
       slider.style.transform = `rotate(${degrees}deg)`;
       const normalizedValue = (((newRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI)) / (2 * Math.PI);
       sendParameter(id, normalizedValue);
     });
     
-    slider.addEventListener("pointerup", () => {
-      isDragging = false;
-    });
-    
-    slider.addEventListener("pointercancel", () => {
-      isDragging = false;
-    });
+    slider.addEventListener("pointerup", () => { isDragging = false; });
+    slider.addEventListener("pointercancel", () => { isDragging = false; });
   });
 }
 
@@ -318,7 +329,7 @@ function setupVolumeSlider() {
   let isDragging = false;
   let startX = 0;
   let thumbStartLeft = 0;
-  const maxLeft = container.clientWidth - thumb.clientWidth; // 140px
+  const maxLeft = container.clientWidth - thumb.clientWidth;
   
   thumb.addEventListener("pointerdown", (e) => {
     isDragging = true;
