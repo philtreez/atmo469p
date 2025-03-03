@@ -71,8 +71,8 @@ const smoothingFactor = 0.05;      // Kleinere Werte = glattere Übergänge
 
 // ================= Morphing 3D-Objekt Setup =================
 
-// Erstelle eine feingetesselte Kugelgeometrie als Basis für das Morphing
-const geometry = new THREE.SphereGeometry(1.5, 128, 128);
+// Statt einer Kugel verwenden wir nun einen TorusKnot als Grundform
+const geometry = new THREE.TorusKnotGeometry(1.5, 0.4, 200, 32);
 // Speichere die ursprünglichen Vertex-Positionen
 geometry.userData.origPositions = geometry.attributes.position.array.slice(0);
 
@@ -94,7 +94,7 @@ function animate() {
   requestAnimationFrame(animate);
   const time = clock.getElapsedTime();
 
-  // Smoothing: Angleiche alle Zielwerte
+  // Smoothing: Angleiche die aktuellen Werte an die Zielwerte
   currentMorphIntensity += (targetMorphIntensity - currentMorphIntensity) * smoothingFactor;
   currentMorphFrequency += (targetMorphFrequency - currentMorphFrequency) * smoothingFactor;
   currentNoiseFactor     += (targetNoiseFactor - currentNoiseFactor) * smoothingFactor;
@@ -125,13 +125,14 @@ function animate() {
   morphObject.rotation.x += 0.005;
   morphObject.rotation.y += 0.005;
 
-  // Optionale leichte Kamera-Bewegung (hier kannst du auch statisch bleiben, um den "Schwebe-Effekt" zu verstärken)
+  // Optionale leichte Kamera-Bewegung
   camera.position.x = Math.sin(time * 0.5) * 0.5;
   camera.rotation.y = Math.sin(time * 0.3) * 0.1;
 
   composer.render();
 }
 animate();
+
 
 // ================= RNBO Integration =================
 
