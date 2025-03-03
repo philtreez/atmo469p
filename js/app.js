@@ -320,7 +320,7 @@ function setupVolumeSlider() {
   const maxMovement = sliderWidth - thumbWidth; // z. B. 210px
   
   // Setze initialen Wert, z. B. 0.8
-  const initialValue = 0.8;
+  const initialValue = 0.1;
   const initialX = maxMovement * initialValue;
   thumb.style.left = initialX + "px";
   sendValueToRNBO("vol", initialValue);
