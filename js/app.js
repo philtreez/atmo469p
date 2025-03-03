@@ -13,8 +13,8 @@ camera.position.z = 5;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-const container = document.getElementById("threejs-container") || document.body;
-container.appendChild(renderer.domElement);
+const threeContainer = document.getElementById("threejs-container") || document.body;
+threeContainer.appendChild(renderer.domElement);
 
 const composer = new THREE.EffectComposer(renderer);
 const renderPass = new THREE.RenderPass(scene, camera);
@@ -37,14 +37,15 @@ composer.addPass(glitchPass);
 
 // ================= Tunnel-Effekt Setup =================
 
-// Parameter: 40 Slices, 5 Einheiten Abstand, Geschwindigkeit 24 Einheiten pro Sekunde
+// Hier definieren wir den Tunnel als eine Serie von Slices (Mesh) entlang der Z-Achse.
 const numPlanes = 40;
 const planeSpacing = 5;
 const speed = 24;
 const tunnelPlanes = [];
 
 /**
- * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen, kleinen Loch.
+ * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen kleinen Loch.
+ * (Hinweis: Das "Loch" wird hier als sehr kleiner Bereich definiert, damit der Tunnel-Look erhalten bleibt.)
  */
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   const shape = new THREE.Shape();
@@ -53,8 +54,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   shape.lineTo(width / 2, height / 2);
   shape.lineTo(-width / 2, height / 2);
   shape.lineTo(-width / 2, -height / 2);
-
-  // Das "Loch" ist hier klein (holeSize/8)
+  // Definiere ein sehr kleines "Loch" in der Mitte (holeSize/8)
   const halfHole = holeSize / 8;
   const holePath = new THREE.Path();
   holePath.moveTo(-halfHole, -halfHole);
@@ -63,7 +63,6 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   holePath.lineTo(-halfHole, halfHole);
   holePath.lineTo(-halfHole, -halfHole);
   shape.holes.push(holePath);
-
   return new THREE.ShapeGeometry(shape, segments);
 }
 
@@ -86,11 +85,11 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
-
-  // Optionale Kamera-Bewegung
+  
+  // Optional: leichte Kamera-Animation
   camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
   camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
-
+  
   tunnelPlanes.forEach(mesh => {
     mesh.position.z += speed * delta;
     mesh.position.x = Math.sin((mesh.position.z + clock.elapsedTime) * 0.1) * 0.5;
@@ -106,9 +105,12 @@ animate();
 
 // ================= RNBO Integration =================
 
-// Globales RNBO-Gerät; initial noch null
+// Globales RNBO-Gerät – wird später gesetzt
 window.rnboDevice = null;
-// Parameter-Queue: Wenn Slider vor RNBO-Setup Änderungen senden, werden diese hier zwischengespeichert.
+// Damit sendValueToRNBO im Volume- und Rotary-Slider funktioniert, speichern wir das RNBO-Gerät auch in einer globalen Variable "device".
+window.device = null;
+
+// Wir verwenden hier einen einfachen Parameter-Queue, falls Slider-Eingaben erfolgen, bevor RNBO bereit ist.
 let parameterQueue = {};
 
 async function setupRNBO() {
@@ -130,20 +132,19 @@ async function setupRNBO() {
     return;
   }
   
-  let device;
+  let deviceInstance;
   try {
-    device = await RNBO.createDevice({ context, patcher });
+    deviceInstance = await RNBO.createDevice({ context, patcher });
   } catch (err) {
     console.error("Fehler beim Erstellen des RNBO-Geräts:", err);
     return;
   }
   
-  window.rnboDevice = device;
-  device.node.connect(outputNode);
-  attachRNBOMessages(device);
-  attachOutports(device);
-  
-  // Sobald rnboDevice verfügbar ist, werden alle zwischengespeicherten Parameter gesendet.
+  window.rnboDevice = deviceInstance;
+  window.device = deviceInstance; // Für sendValueToRNBO
+  deviceInstance.node.connect(outputNode);
+  attachRNBOMessages(deviceInstance);
+  attachOutports(deviceInstance);
   flushParameterQueue();
   
   document.body.onclick = () => context.resume();
@@ -166,29 +167,31 @@ function loadRNBOScript(version) {
   });
 }
 
-// Sendet den Parameter; wenn rnboDevice nicht verfügbar ist, wird er in der Queue gespeichert.
-function sendParameter(id, value) {
-  if (window.rnboDevice && rnboDevice.sendMessage) {
-    rnboDevice.sendMessage(id, value);
-    console.log(`Parameter ${id} gesetzt auf ${value}`);
+// Sendet den Parameterwert an RNBO; wenn device noch nicht verfügbar, wird er in der Queue gespeichert.
+function sendValueToRNBO(param, value) {
+  if (window.device && window.device.parametersById && window.device.parametersById.has(param)) {
+    window.device.parametersById.get(param).value = value;
+    console.log(`🎛 Updated RNBO param: ${param} = ${value}`);
   } else {
-    console.warn("rnboDevice nicht verfügbar. Parameter wird zwischengespeichert:", id, value);
-    parameterQueue[id] = value;
+    console.warn(`rnboDevice nicht verfügbar. Parameter ${param} wird zwischengespeichert:`, value);
+    parameterQueue[param] = value;
   }
 }
 
-// Sobald rnboDevice verfügbar ist, werden alle zwischengespeicherten Parameter gesendet.
+// Sobald device verfügbar ist, werden alle zwischengespeicherten Werte gesendet.
 function flushParameterQueue() {
-  if (window.rnboDevice && rnboDevice.sendMessage) {
-    for (const [id, value] of Object.entries(parameterQueue)) {
-      rnboDevice.sendMessage(id, value);
-      console.log(`Zwischengespeicherter Parameter ${id} gesetzt auf ${value}`);
+  if (window.device && window.device.parametersById) {
+    for (const [param, value] of Object.entries(parameterQueue)) {
+      if (window.device.parametersById.has(param)) {
+        window.device.parametersById.get(param).value = value;
+        console.log(`🎛 Zwischengespeicherter Parameter ${param} gesetzt auf ${value}`);
+      }
     }
     parameterQueue = {};
   }
 }
 
-// Aktualisiert den Slider basierend auf einem RNBO-Wert (0-1)
+// Aktualisiert den Rotary-Slider visuell (0-1 entspricht 0 bis 270°)
 function updateSliderFromRNBO(id, value) {
   const slider = document.getElementById("slider-" + id);
   if (slider) {
@@ -223,7 +226,6 @@ function attachOutports(device) {
     if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
       const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
       const randomPlane = tunnelPlanes[randomIndex];
-      
       const edges = new THREE.EdgesGeometry(gridGeometry);
       const lineMaterial = new THREE.LineBasicMaterial({
         color: 0x00ff82,
@@ -250,7 +252,7 @@ function attachOutports(device) {
   });
 }
 
-// ================= Rotary Slider Setup (s1 - s8) =================
+// ================= Rotary Slider Setup (IDs: slider-s1 ... slider-s8) =================
 
 function setupRotarySliders() {
   const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
@@ -294,10 +296,11 @@ function setupRotarySliders() {
       const deltaAngle = angle - startAngle;
       const newRotation = initialRotation + deltaAngle;
       slider.dataset.rotation = newRotation;
+      // 0-1 entspricht 0 bis 270° Drehung
       const degrees = (((newRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI)) * (270 / (2 * Math.PI));
       slider.style.transform = `rotate(${degrees}deg)`;
       const normalizedValue = (((newRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI)) / (2 * Math.PI);
-      sendParameter(id, normalizedValue);
+      sendValueToRNBO(id, normalizedValue);
     });
     
     slider.addEventListener("pointerup", () => { isDragging = false; });
@@ -306,58 +309,53 @@ function setupRotarySliders() {
 }
 
 // ================= Volume Slider Setup =================
+// Hier verwenden wir den Stil aus deinem Beispiel (IDs: volume-slider, volume-thumb)
 
 function setupVolumeSlider() {
-  const container = document.getElementById("slider-vol-container");
-  const thumb = document.getElementById("slider-vol-thumb");
-  if (!container || !thumb) {
-    console.warn("Volume slider Elemente nicht gefunden.");
+  const slider = document.getElementById("volume-slider");  // Container, z. B. 280px x 40px
+  const thumb = document.getElementById("volume-thumb");      // Thumb, z. B. 70px x 70px
+  if (!slider || !thumb) {
+    console.error("Volume slider elements not found!");
     return;
   }
   
-  container.style.position = "relative";
-  container.style.width = "180px";
-  container.style.height = "40px";
+  const sliderWidth = slider.offsetWidth;   // Erwartet z. B. 280px
+  const thumbWidth = thumb.offsetWidth;       // Erwartet z. B. 70px
+  const maxMovement = sliderWidth - thumbWidth; // z. B. 210px
   
-  thumb.style.position = "absolute";
-  thumb.style.width = "40px";
-  thumb.style.height = "40px";
-  thumb.style.left = "0px";
-  thumb.style.top = "0px";
-  thumb.style.touchAction = "none";
+  // Initialen Wert setzen, z. B. 0.8
+  const initialValue = 0.8;
+  const initialX = maxMovement * initialValue;
+  thumb.style.left = initialX + "px";
+  sendValueToRNBO("vol", initialValue);
   
   let isDragging = false;
-  let startX = 0;
-  let thumbStartLeft = 0;
-  const maxLeft = container.clientWidth - thumb.clientWidth;
-  
-  thumb.addEventListener("pointerdown", (e) => {
+  thumb.addEventListener("mousedown", (e) => {
     isDragging = true;
-    startX = e.clientX;
-    thumbStartLeft = parseFloat(thumb.style.left);
-    thumb.setPointerCapture(e.pointerId);
+    e.preventDefault();
   });
   
-  thumb.addEventListener("pointermove", (e) => {
+  document.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
-    const dx = e.clientX - startX;
-    let newLeft = thumbStartLeft + dx;
-    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-    thumb.style.left = newLeft + "px";
-    const normalizedValue = newLeft / maxLeft;
-    sendParameter("vol", normalizedValue);
+    const sliderRect = slider.getBoundingClientRect();
+    let newX = e.clientX - sliderRect.left - (thumbWidth / 2);
+    newX = Math.max(0, Math.min(newX, maxMovement));
+    thumb.style.left = newX + "px";
+    const normalizedValue = newX / maxMovement;
+    sendValueToRNBO("vol", normalizedValue);
   });
   
-  thumb.addEventListener("pointerup", () => { isDragging = false; });
-  thumb.addEventListener("pointercancel", () => { isDragging = false; });
+  document.addEventListener("mouseup", () => {
+    isDragging = false;
+  });
 }
 
 function updateVolumeSliderFromRNBO(value) {
-  const container = document.getElementById("slider-vol-container");
-  const thumb = document.getElementById("slider-vol-thumb");
-  if (!container || !thumb) return;
-  const maxLeft = container.clientWidth - thumb.clientWidth;
-  thumb.style.left = (value * maxLeft) + "px";
+  const slider = document.getElementById("volume-slider");
+  const thumb = document.getElementById("volume-thumb");
+  if (!slider || !thumb) return;
+  const maxMovement = slider.offsetWidth - thumb.offsetWidth;
+  thumb.style.left = (value * maxMovement) + "px";
 }
 
 // ================= DOMContentLoaded Aufrufe =================
