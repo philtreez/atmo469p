@@ -27,13 +27,35 @@ const bloomPass = new THREE.UnrealBloomPass(
   0.3   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 0.3;
+bloomPass.strength = 0.5;
 bloomPass.radius = 0.2;
 composer.addPass(bloomPass);
 
 const glitchPass = new THREE.GlitchPass();
 glitchPass.enabled = false;
 composer.addPass(glitchPass);
+
+// ================= Star Field (Hintergrund) =================
+
+function createStarField() {
+  const starCount = 10000;
+  const starGeometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    positions[i * 3]     = (Math.random() - 0.5) * 2000;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 2000;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 2000;
+  }
+  starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const starMaterial = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 0.7,
+    sizeAttenuation: true
+  });
+  const stars = new THREE.Points(starGeometry, starMaterial);
+  scene.add(stars);
+}
+createStarField();
 
 // ================= Zusätzliche Parameter mit Smoothing =================
 let targetMorphIntensity = 0.3;    // Wird per RNBO-Nachricht gesetzt
@@ -103,14 +125,13 @@ function animate() {
   morphObject.rotation.x += 0.005;
   morphObject.rotation.y += 0.005;
 
-  // Optionale leichte Kamera-Bewegung
+  // Optionale leichte Kamera-Bewegung (hier kannst du auch statisch bleiben, um den "Schwebe-Effekt" zu verstärken)
   camera.position.x = Math.sin(time * 0.5) * 0.5;
   camera.rotation.y = Math.sin(time * 0.3) * 0.1;
 
   composer.render();
 }
 animate();
-
 
 // ================= RNBO Integration =================
 
