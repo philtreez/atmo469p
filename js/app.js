@@ -55,7 +55,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   shape.lineTo(-width/2, height/2);
   shape.lineTo(-width/2, -height/2);
   
-  // Definiere ein sehr kleines "Loch" (holeSize/8)
+  // Kleines "Loch": holeSize/8
   const halfHole = holeSize / 8;
   const holePath = new THREE.Path();
   holePath.moveTo(-halfHole, -halfHole);
@@ -88,7 +88,7 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   
-  // Optionale Kamera-Bewegung
+  // Optionale Kamera-Bewegung:
   camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
   camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
   
@@ -187,33 +187,50 @@ function flushParameterQueue() {
   }
 }
 
-// Aktualisiert Rotary-Slider (s1-s8) visuell (0-1 entspricht 0 bis 270°)
+// ================= Steuerung: RNBO Nachrichten =================
+
 function updateSliderFromRNBO(id, value) {
   const slider = document.getElementById("slider-" + id);
   if (slider) {
     slider.dataset.value = value;
-    const degrees = value * 270;
+    const degrees = value * 270; // 0-1 entspricht 0 bis 270° Drehung
     slider.style.transform = `rotate(${degrees}deg)`;
   }
 }
 
-// Aktualisiert den Button-Zustand (b1-b8) basierend auf einem RNBO-Wert (0 oder 1)
 function updateButtonFromRNBO(id, value) {
+  // Für die Buttons (b1-b8) setzen wir die Opacity: 0 = unsichtbar, 1 = sichtbar
   const button = document.getElementById(id);
   if (button) {
     button.dataset.value = value.toString();
-    // Bei 0: transparent (opacity 0), bei 1: sichtbar (opacity 1)
     button.style.opacity = (parseInt(value) === 1) ? "1" : "0";
   }
 }
 
+// Neue Funktion für die Light-Buttons (light1 und light2)
+function updateLights(outport, value) {
+  // value wird als Ganzzahl interpretiert (0-8)
+  const intVal = Math.round(parseFloat(value));
+  for (let i = 1; i <= 8; i++) {
+    const el = document.getElementById(`${outport}-${i}`);
+    if (el) {
+      // Wenn value 0 ist, sollen alle unsichtbar sein;
+      // sonst wird nur der DIV sichtbar, dessen Zahl dem gesendeten Wert entspricht.
+      el.style.opacity = (intVal === i) ? "1" : "0";
+    }
+  }
+}
+
 function attachRNBOMessages(device) {
-  const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"];
+  // Hier erwarten wir Parameter/Outports mit IDs: s1-s8, vol, b1-b8, light1 und light2.
+  const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "light1", "light2"];
   if (device.parameterChangeEvent) {
     device.parameterChangeEvent.subscribe(param => {
       if (controlIds.includes(param.id)) {
         if (param.id.startsWith("b")) {
           updateButtonFromRNBO(param.id, parseFloat(param.value));
+        } else if (param.id.startsWith("light")) {
+          updateLights(param.id, param.value);
         } else {
           updateSliderFromRNBO(param.id, parseFloat(param.value));
         }
@@ -225,6 +242,8 @@ function attachRNBOMessages(device) {
       if (controlIds.includes(ev.tag)) {
         if (ev.tag.startsWith("b")) {
           updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
+        } else if (ev.tag.startsWith("light")) {
+          updateLights(ev.tag, ev.payload);
         } else {
           updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
         }
@@ -269,8 +288,7 @@ function attachOutports(device) {
 
 function setupRotarySliders() {
   const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
-  // Sensitivität: Änderung pro Pixel
-  const sensitivity = 0.005;
+  const sensitivity = 0.005; // Änderung pro Pixel
   
   sliderIds.forEach(id => {
     const slider = document.getElementById("slider-" + id);
@@ -305,12 +323,11 @@ function setupRotarySliders() {
       if (!isDragging) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      // Kombinierte horizontale und vertikale Bewegung: (dx - dy)
       const delta = (dx - dy) * sensitivity;
       let newValue = initialValue + delta;
       newValue = Math.max(0, Math.min(newValue, 1));
       slider.dataset.value = newValue.toString();
-      const degrees = newValue * 270; // 0-1 entspricht 0 bis 270°
+      const degrees = newValue * 270;
       slider.style.transform = `rotate(${degrees}deg)`;
       sendValueToRNBO(id, newValue);
     });
@@ -376,7 +393,7 @@ function setupButtons() {
       console.warn("Button element nicht gefunden:", id);
       return;
     }
-    // Initialer Zustand: 0 = transparent (unsichtbar)
+    // Initialer Zustand: 0 = unsichtbar (transparent)
     button.dataset.value = "0";
     button.style.opacity = "0";
     button.style.cursor = "pointer";
@@ -396,6 +413,20 @@ function updateButtonFromRNBO(id, value) {
   if (button) {
     button.dataset.value = value.toString();
     button.style.opacity = (parseInt(value) === 1) ? "1" : "0";
+  }
+}
+
+// ================= Light-Buttons Setup (IDs: light1 and light2) =================
+
+// Für jeden Outport (light1, light2) gehen wir davon aus, dass du 8 DIVs hast,
+// deren IDs "light1-1" ... "light1-8" bzw. "light2-1" ... "light2-8" lauten.
+function updateLights(outport, value) {
+  const intVal = Math.round(parseFloat(value));
+  for (let i = 1; i <= 8; i++) {
+    const el = document.getElementById(`${outport}-${i}`);
+    if (el) {
+      el.style.opacity = (intVal === i) ? "1" : "0";
+    }
   }
 }
 
