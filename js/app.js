@@ -158,6 +158,7 @@ async function setupRNBO() {
   
   device.node.connect(outputNode);
   attachOutports(device);
+  makeRotarySliders(device);
   
   // Resume AudioContext bei Nutzerinteraktion
   document.body.onclick = () => context.resume();
@@ -178,6 +179,114 @@ function loadRNBOScript(version) {
     document.body.appendChild(el);
   });
 }
+
+function setupRotarySliders() {
+  // Verwende IDs s1 bis s8
+  const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
+  
+  sliderIds.forEach(id => {
+    const slider = document.getElementById("slider-" + id);
+    if (!slider) {
+      console.warn("Slider element not found: ", "slider-" + id);
+      return;
+    }
+    
+    // Setze Standard-Stile (können auch im Webflow-Designer definiert werden)
+    slider.style.width = "50px";
+    slider.style.height = "50px";
+    slider.style.borderRadius = "50%";
+    // Hintergrund: Hier den Pfad zu deinem PNG-Bild anpassen
+    slider.style.background = "url('https://cdn.prod.website-files.com/67c27c3b4c668c9f3ca429ed/67c5139a38c39d6a75bac9ac_silderpoint60_60.png') center/cover no-repeat";
+    slider.style.transform = "rotate(0deg)";
+    slider.style.touchAction = "none"; // für Touch-Interaktion
+    
+    // Speichere den aktuellen Rotationswert (in Radiant) als Data-Attribut
+    slider.dataset.rotation = "0";
+    
+    let isDragging = false;
+    let startAngle = 0;
+    let initialRotation = 0;
+    
+    slider.addEventListener("pointerdown", (e) => {
+      isDragging = true;
+      const rect = slider.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      // Berechne den Startwinkel relativ zum Mittelpunkt
+      startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+      initialRotation = parseFloat(slider.dataset.rotation);
+      slider.setPointerCapture(e.pointerId);
+    });
+    
+    slider.addEventListener("pointermove", (e) => {
+      if (!isDragging) return;
+      const rect = slider.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+      // Delta zwischen aktuellem Winkel und Startwinkel
+      const deltaAngle = angle - startAngle;
+      const newRotation = initialRotation + deltaAngle;
+      slider.dataset.rotation = newRotation;
+      // Umrechnung in Grad, aber hier maximal 270° statt 360°
+      const degrees = ((newRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI) * (270 / (2 * Math.PI));
+      slider.style.transform = `rotate(${degrees}deg)`;
+      // Normalisiere: 0 entspricht 0 und 1 entspricht 270°
+      const normalizedValue = (((newRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI)) / (2 * Math.PI);
+      // Da wir nur 270° nutzen, entspricht normalizedValue * 270 dem tatsächlichen Winkel in Grad.
+      sendParameter(id, normalizedValue);
+    });
+    
+    slider.addEventListener("pointerup", () => {
+      isDragging = false;
+    });
+    
+    slider.addEventListener("pointercancel", () => {
+      isDragging = false;
+    });
+  });
+}
+
+// Funktion zum Senden des Parameterwerts an RNBO
+function sendParameter(id, value) {
+  // Beispiel: Falls dein RNBO-Gerät über sendMessage(tag, payload) verfügt:
+  if (window.rnboDevice && rnboDevice.sendMessage) {
+    rnboDevice.sendMessage(id, value);
+  } else {
+    console.log("Parameter senden:", id, value);
+  }
+}
+
+// Wird aufgerufen, wenn RNBO einen neuen Parameterwert sendet,
+// und aktualisiert den visuellen Drehwinkel des zugehörigen Sliders.
+function updateSliderFromRNBO(id, value) {
+  const slider = document.getElementById("slider-" + id);
+  if (slider) {
+    // Berechne den Drehwinkel in Radiant basierend auf 0-1 (0 entspricht 0°, 1 entspricht 270°)
+    const rotation = value * 2 * Math.PI; // Intern bleibt das in Radiant
+    slider.dataset.rotation = rotation;
+    // Umrechnung: 0-1 entspricht 0 bis 270 Grad
+    const degrees = rotation * (270 / (2 * Math.PI));
+    slider.style.transform = `rotate(${degrees}deg)`;
+  }
+}
+
+// Beispiel: RNBO Nachrichten verarbeiten und den Slider aktualisieren
+function attachRNBOMessages(device) {
+  device.messageEvent.subscribe((ev) => {
+    // Erwartet werden Parameter mit IDs s1 bis s8
+    const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
+    if (sliderIds.includes(ev.tag)) {
+      updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
+    }
+    console.log(`${ev.tag}: ${ev.payload}`);
+  });
+}
+
+// Aufruf: Starte das Setup, wenn das DOM geladen ist.
+document.addEventListener("DOMContentLoaded", () => {
+  setupRotarySliders();
+});
 
 // RNBO Outport-Listener: reagiert auf "grider" und "glitchy"
 function attachOutports(device) {
