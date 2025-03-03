@@ -55,7 +55,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   shape.lineTo(-width/2, height/2);
   shape.lineTo(-width/2, -height/2);
   
-  // Kleines "Loch": holeSize/8
+  // Definiere ein sehr kleines "Loch": holeSize/8
   const halfHole = holeSize / 8;
   const holePath = new THREE.Path();
   holePath.moveTo(-halfHole, -halfHole);
@@ -199,30 +199,27 @@ function updateSliderFromRNBO(id, value) {
 }
 
 function updateButtonFromRNBO(id, value) {
-  // Für die Buttons (b1-b8) setzen wir die Opacity: 0 = unsichtbar, 1 = sichtbar
   const button = document.getElementById(id);
   if (button) {
     button.dataset.value = value.toString();
+    // Hier steuern wir nur die Opacity, ohne Hintergrundfarbe zu setzen.
     button.style.opacity = (parseInt(value) === 1) ? "1" : "0";
   }
 }
 
-// Neue Funktion für die Light-Buttons (light1 und light2)
 function updateLights(outport, value) {
-  // value wird als Ganzzahl interpretiert (0-8)
   const intVal = Math.round(parseFloat(value));
+  console.log(`Update Lights for ${outport}: ${intVal}`);
+  // Wenn der Wert 0 ist, sollen alle unsichtbar sein.
   for (let i = 1; i <= 8; i++) {
     const el = document.getElementById(`${outport}-${i}`);
     if (el) {
-      // Wenn value 0 ist, sollen alle unsichtbar sein;
-      // sonst wird nur der DIV sichtbar, dessen Zahl dem gesendeten Wert entspricht.
       el.style.opacity = (intVal === i) ? "1" : "0";
     }
   }
 }
 
 function attachRNBOMessages(device) {
-  // Hier erwarten wir Parameter/Outports mit IDs: s1-s8, vol, b1-b8, light1 und light2.
   const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "light1", "light2"];
   if (device.parameterChangeEvent) {
     device.parameterChangeEvent.subscribe(param => {
@@ -393,7 +390,7 @@ function setupButtons() {
       console.warn("Button element nicht gefunden:", id);
       return;
     }
-    // Initialer Zustand: 0 = unsichtbar (transparent)
+    // Initialer Zustand: 0 = unsichtbar
     button.dataset.value = "0";
     button.style.opacity = "0";
     button.style.cursor = "pointer";
@@ -416,18 +413,82 @@ function updateButtonFromRNBO(id, value) {
   }
 }
 
-// ================= Light-Buttons Setup (IDs: light1 and light2) =================
+// ================= Light-Buttons Setup (IDs: light1-1 ... light1-8 und light2-1 ... light2-8) =================
 
-// Für jeden Outport (light1, light2) gehen wir davon aus, dass du 8 DIVs hast,
-// deren IDs "light1-1" ... "light1-8" bzw. "light2-1" ... "light2-8" lauten.
 function updateLights(outport, value) {
   const intVal = Math.round(parseFloat(value));
+  console.log(`Update Lights for ${outport}: ${intVal}`);
   for (let i = 1; i <= 8; i++) {
     const el = document.getElementById(`${outport}-${i}`);
     if (el) {
-      el.style.opacity = (intVal === i) ? "1" : "0";
+      // Bei 0 alle unsichtbar, ansonsten nur der entsprechende Button sichtbar
+      el.style.opacity = (intVal === 0) ? "0" : ((intVal === i) ? "1" : "0");
     }
   }
+}
+
+// ================= RNBO Steuerung: Nachrichten und Outports =================
+
+function attachRNBOMessages(device) {
+  const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "light1", "light2"];
+  if (device.parameterChangeEvent) {
+    device.parameterChangeEvent.subscribe(param => {
+      if (controlIds.includes(param.id)) {
+        if (param.id.startsWith("b")) {
+          updateButtonFromRNBO(param.id, parseFloat(param.value));
+        } else if (param.id.startsWith("light")) {
+          updateLights(param.id, param.value);
+        } else {
+          updateSliderFromRNBO(param.id, parseFloat(param.value));
+        }
+      }
+      console.log(`Parameter ${param.id} geändert: ${param.value}`);
+    });
+  } else if (device.messageEvent) {
+    device.messageEvent.subscribe(ev => {
+      if (controlIds.includes(ev.tag)) {
+        if (ev.tag.startsWith("b")) {
+          updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
+        } else if (ev.tag.startsWith("light")) {
+          updateLights(ev.tag, ev.payload);
+        } else {
+          updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
+        }
+      }
+      console.log(`Message ${ev.tag}: ${ev.payload}`);
+    });
+  }
+}
+
+function attachOutports(device) {
+  device.messageEvent.subscribe(ev => {
+    if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
+      const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
+      const randomPlane = tunnelPlanes[randomIndex];
+      const edges = new THREE.EdgesGeometry(gridGeometry);
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0x00ff82,
+        linewidth: 40,
+        transparent: true,
+        opacity: 0.65,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      });
+      const thickOutline = new THREE.LineSegments(edges, lineMaterial);
+      thickOutline.scale.set(1, 1, 1);
+      randomPlane.add(thickOutline);
+      setTimeout(() => {
+        randomPlane.remove(thickOutline);
+      }, 100);
+    }
+    
+    if (ev.tag === "glitchy") {
+      glitchPass.enabled = (parseInt(ev.payload) === 1);
+    }
+    
+    console.log(`${ev.tag}: ${ev.payload}`);
+  });
 }
 
 // ================= DOMContentLoaded Aufrufe =================
