@@ -45,7 +45,7 @@ const tunnelPlanes = [];
 
 /**
  * Erzeugt ein Grid als Shape-Geometrie mit einem sehr kleinen zentralen Loch.
- * (Das Loch wird hier als sehr kleiner Bereich definiert, um den Tunnel-Look zu erhalten.)
+ * (Das "Loch" wird hier als sehr kleiner Bereich definiert, um den Tunnel-Look zu erhalten.)
  */
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   const shape = new THREE.Shape();
@@ -197,17 +197,13 @@ function updateSliderFromRNBO(id, value) {
   }
 }
 
-// Aktualisiert den Button-Zustand (b1-b8) basierend auf einem RNBO-Wert (1 oder 2)
+// Aktualisiert den Button-Zustand (b1-b8) basierend auf einem RNBO-Wert (0 oder 1)
 function updateButtonFromRNBO(id, value) {
   const button = document.getElementById(id);
   if (button) {
-    button.dataset.value = value;
-    // Zum Beispiel: Zustand 1 = inaktiv (grau), Zustand 2 = aktiv (Neon-Grün)
-    if (parseInt(value) === 2) {
-      button.style.backgroundColor = "#00ff82";
-    } else {
-      button.style.backgroundColor = "#cccccc";
-    }
+    button.dataset.value = value.toString();
+    // Bei 0: transparent (opacity 0), bei 1: sichtbar (opacity 1)
+    button.style.opacity = (parseInt(value) === 1) ? "1" : "0";
   }
 }
 
@@ -273,7 +269,8 @@ function attachOutports(device) {
 
 function setupRotarySliders() {
   const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
-  const sensitivity = 0.005; // Änderung pro Pixel
+  // Sensitivität: Änderung pro Pixel
+  const sensitivity = 0.005;
   
   sliderIds.forEach(id => {
     const slider = document.getElementById("slider-" + id);
@@ -308,7 +305,7 @@ function setupRotarySliders() {
       if (!isDragging) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      // Kombiniere horizontale und vertikale Bewegungen: Ziehen nach rechts UND nach oben erhöht den Wert
+      // Kombinierte horizontale und vertikale Bewegung: (dx - dy)
       const delta = (dx - dy) * sensitivity;
       let newValue = initialValue + delta;
       newValue = Math.max(0, Math.min(newValue, 1));
@@ -379,25 +376,16 @@ function setupButtons() {
       console.warn("Button element nicht gefunden:", id);
       return;
     }
-    // Initialer Zustand: 1 (inaktiv)
-    button.dataset.value = "1";
-    // Beispielhafte Stile: 60x60, inline-block, Cursor pointer
-    button.style.width = "60px";
-    button.style.height = "60px";
-    button.style.display = "inline-block";
+    // Initialer Zustand: 0 = transparent (unsichtbar)
+    button.dataset.value = "0";
+    button.style.opacity = "0";
     button.style.cursor = "pointer";
-    // Zustand 1 = inaktiv (hellgrau), Zustand 2 = aktiv (Neon-Grün)
-    button.style.backgroundColor = "#cccccc";
     
     button.addEventListener("click", () => {
       let current = parseInt(button.dataset.value);
-      let newValue = (current === 1) ? 2 : 1;
+      let newValue = (current === 0) ? 1 : 0;
       button.dataset.value = newValue.toString();
-      if (newValue === 2) {
-        button.style.backgroundColor = "#00ff82";
-      } else {
-        button.style.backgroundColor = "#cccccc";
-      }
+      button.style.opacity = (newValue === 1) ? "1" : "0";
       sendValueToRNBO(id, newValue);
     });
   });
@@ -407,11 +395,7 @@ function updateButtonFromRNBO(id, value) {
   const button = document.getElementById(id);
   if (button) {
     button.dataset.value = value.toString();
-    if (parseInt(value) === 2) {
-      button.style.backgroundColor = "#00ff82";
-    } else {
-      button.style.backgroundColor = "#cccccc";
-    }
+    button.style.opacity = (parseInt(value) === 1) ? "1" : "0";
   }
 }
 
