@@ -44,8 +44,8 @@ const speed = 24;
 const tunnelPlanes = [];
 
 /**
- * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen, kleinen Loch.
- * (Das "Loch" wird hier als sehr kleiner Bereich definiert.)
+ * Erzeugt ein Grid als Shape-Geometrie mit einem sehr kleinen zentralen Loch.
+ * (Das Loch wird hier als sehr kleiner Bereich definiert, um den Tunnel-Look zu erhalten.)
  */
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   const shape = new THREE.Shape();
@@ -55,7 +55,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   shape.lineTo(-width/2, height/2);
   shape.lineTo(-width/2, -height/2);
   
-  // Das "Loch" wird als kleiner Bereich definiert (holeSize/8)
+  // Definiere ein sehr kleines "Loch" (holeSize/8)
   const halfHole = holeSize / 8;
   const holePath = new THREE.Path();
   holePath.moveTo(-halfHole, -halfHole);
@@ -88,7 +88,7 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   
-  // Optionale Kamera-Bewegung:
+  // Optionale Kamera-Bewegung
   camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
   camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
   
@@ -187,29 +187,51 @@ function flushParameterQueue() {
   }
 }
 
+// Aktualisiert Rotary-Slider (s1-s8) visuell (0-1 entspricht 0 bis 270°)
 function updateSliderFromRNBO(id, value) {
   const slider = document.getElementById("slider-" + id);
   if (slider) {
-    // Visualisierung: 0-1 entspricht 0 bis 270° Drehung
-    const degrees = value * 270;
     slider.dataset.value = value;
+    const degrees = value * 270;
     slider.style.transform = `rotate(${degrees}deg)`;
   }
 }
 
+// Aktualisiert den Button-Zustand (b1-b8) basierend auf einem RNBO-Wert (1 oder 2)
+function updateButtonFromRNBO(id, value) {
+  const button = document.getElementById(id);
+  if (button) {
+    button.dataset.value = value;
+    // Zum Beispiel: Zustand 1 = inaktiv (grau), Zustand 2 = aktiv (Neon-Grün)
+    if (parseInt(value) === 2) {
+      button.style.backgroundColor = "#00ff82";
+    } else {
+      button.style.backgroundColor = "#cccccc";
+    }
+  }
+}
+
 function attachRNBOMessages(device) {
-  const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol"];
+  const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"];
   if (device.parameterChangeEvent) {
     device.parameterChangeEvent.subscribe(param => {
-      if (sliderIds.includes(param.id)) {
-        updateSliderFromRNBO(param.id, parseFloat(param.value));
+      if (controlIds.includes(param.id)) {
+        if (param.id.startsWith("b")) {
+          updateButtonFromRNBO(param.id, parseFloat(param.value));
+        } else {
+          updateSliderFromRNBO(param.id, parseFloat(param.value));
+        }
       }
       console.log(`Parameter ${param.id} geändert: ${param.value}`);
     });
   } else if (device.messageEvent) {
     device.messageEvent.subscribe(ev => {
-      if (sliderIds.includes(ev.tag)) {
-        updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
+      if (controlIds.includes(ev.tag)) {
+        if (ev.tag.startsWith("b")) {
+          updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
+        } else {
+          updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
+        }
       }
       console.log(`Message ${ev.tag}: ${ev.payload}`);
     });
@@ -249,11 +271,9 @@ function attachOutports(device) {
 
 // ================= Rotary Slider Setup (IDs: slider-s1 ... slider-s8) =================
 
-// Hier passen wir die Bedienung so an, dass sowohl horizontale als auch vertikale Bewegungen berücksichtigt werden.
 function setupRotarySliders() {
   const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
-  // Sensitivität: Änderung pro Pixel (anpassen, falls nötig)
-  const sensitivity = 0.005; 
+  const sensitivity = 0.005; // Änderung pro Pixel
   
   sliderIds.forEach(id => {
     const slider = document.getElementById("slider-" + id);
@@ -269,7 +289,6 @@ function setupRotarySliders() {
     slider.style.transform = "rotate(0deg)";
     slider.style.touchAction = "none";
     
-    // Wir speichern den aktuellen normierten Wert (0-1) im Dataset.
     slider.dataset.value = "0";
     
     let isDragging = false;
@@ -289,12 +308,12 @@ function setupRotarySliders() {
       if (!isDragging) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      // Hier addieren wir horizontal und vertikal: Ziehen nach rechts und nach oben erhöht den Wert.
+      // Kombiniere horizontale und vertikale Bewegungen: Ziehen nach rechts UND nach oben erhöht den Wert
       const delta = (dx - dy) * sensitivity;
       let newValue = initialValue + delta;
       newValue = Math.max(0, Math.min(newValue, 1));
       slider.dataset.value = newValue.toString();
-      const degrees = newValue * 270;  // 0-1 entspricht 0 bis 270° Drehung
+      const degrees = newValue * 270; // 0-1 entspricht 0 bis 270°
       slider.style.transform = `rotate(${degrees}deg)`;
       sendValueToRNBO(id, newValue);
     });
@@ -304,8 +323,7 @@ function setupRotarySliders() {
   });
 }
 
-// ================= Volume Slider Setup =================
-// Verwende hier den Stil aus deinem Beispiel (IDs: volume-slider, volume-thumb)
+// ================= Volume Slider Setup (IDs: volume-slider, volume-thumb) =================
 
 function setupVolumeSlider() {
   const slider = document.getElementById("volume-slider");
@@ -315,18 +333,16 @@ function setupVolumeSlider() {
     return;
   }
   
-  const sliderWidth = slider.offsetWidth;  // z. B. 280px
-  const thumbWidth = thumb.offsetWidth;      // z. B. 70px
-  const maxMovement = sliderWidth - thumbWidth; // z. B. 210px
+  const sliderWidth = slider.offsetWidth;
+  const thumbWidth = thumb.offsetWidth;
+  const maxMovement = sliderWidth - thumbWidth;
   
-  // Setze initialen Wert, z. B. 0.8
-  const initialValue = 0.1;
+  const initialValue = 0.8;
   const initialX = maxMovement * initialValue;
   thumb.style.left = initialX + "px";
   sendValueToRNBO("vol", initialValue);
   
   let isDragging = false;
-  
   thumb.addEventListener("mousedown", (e) => {
     isDragging = true;
     e.preventDefault();
@@ -353,9 +369,56 @@ function updateVolumeSliderFromRNBO(value) {
   thumb.style.left = (value * maxMovement) + "px";
 }
 
+// ================= Button Setup (IDs: b1 ... b8) =================
+
+function setupButtons() {
+  const buttonIds = ["b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"];
+  buttonIds.forEach(id => {
+    const button = document.getElementById(id);
+    if (!button) {
+      console.warn("Button element nicht gefunden:", id);
+      return;
+    }
+    // Initialer Zustand: 1 (inaktiv)
+    button.dataset.value = "1";
+    // Beispielhafte Stile: 60x60, inline-block, Cursor pointer
+    button.style.width = "60px";
+    button.style.height = "60px";
+    button.style.display = "inline-block";
+    button.style.cursor = "pointer";
+    // Zustand 1 = inaktiv (hellgrau), Zustand 2 = aktiv (Neon-Grün)
+    button.style.backgroundColor = "#cccccc";
+    
+    button.addEventListener("click", () => {
+      let current = parseInt(button.dataset.value);
+      let newValue = (current === 1) ? 2 : 1;
+      button.dataset.value = newValue.toString();
+      if (newValue === 2) {
+        button.style.backgroundColor = "#00ff82";
+      } else {
+        button.style.backgroundColor = "#cccccc";
+      }
+      sendValueToRNBO(id, newValue);
+    });
+  });
+}
+
+function updateButtonFromRNBO(id, value) {
+  const button = document.getElementById(id);
+  if (button) {
+    button.dataset.value = value.toString();
+    if (parseInt(value) === 2) {
+      button.style.backgroundColor = "#00ff82";
+    } else {
+      button.style.backgroundColor = "#cccccc";
+    }
+  }
+}
+
 // ================= DOMContentLoaded Aufrufe =================
 
 document.addEventListener("DOMContentLoaded", () => {
   setupVolumeSlider();
   setupRotarySliders();
+  setupButtons();
 });
