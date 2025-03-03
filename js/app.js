@@ -100,12 +100,12 @@ function animate() {
   morphObject.geometry.attributes.position.needsUpdate = true;
 
   // Drehe das Objekt für einen dynamischen Effekt
-  morphObject.rotation.x += 0.005;
-  morphObject.rotation.y += 0.005;
+  morphObject.rotation.x += 0.002;
+  morphObject.rotation.y += 0.002;
 
   // Optionale leichte Kamera-Bewegung
-  camera.position.x = Math.sin(time * 0.5) * 0.5;
-  camera.rotation.y = Math.sin(time * 0.3) * 0.1;
+  camera.position.x = Math.sin(time * 0.3) * 0.3;
+  camera.rotation.y = Math.sin(time * 0.2) * 0.1;
 
   composer.render();
 }
