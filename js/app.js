@@ -35,10 +35,17 @@ const glitchPass = new THREE.GlitchPass();
 glitchPass.enabled = false;
 composer.addPass(glitchPass);
 
-// ================= Zusätzliche Parameter =================
-let morphIntensity = 0.3;    // Steuert die allgemeine Verzerrungsstärke (0 bis 1)
-let morphFrequency = 4.0;    // Bestimmt die Frequenz der Sinuswellen
-let noiseFactor = 0.1;       // Fügt einen zusätzlichen Rauschanteil hinzu
+// ================= Zusätzliche Parameter mit Smoothing =================
+let targetMorphIntensity = 0.3;    // Wird per RNBO-Nachricht gesetzt
+let currentMorphIntensity = 0.3;   // Aktueller, geglätteter Wert
+
+let targetMorphFrequency = 4.0;    // Zielwert für die Frequenz
+let currentMorphFrequency = 4.0;   // Geglätteter Frequenzwert
+
+let targetNoiseFactor = 0.1;       // Zielwert für den Noise-Effekt
+let currentNoiseFactor = 0.1;      // Geglätteter Noise-Wert
+
+const smoothingFactor = 0.05;      // Kleinere Werte = glattere Übergänge
 
 // ================= Morphing 3D-Objekt Setup =================
 
@@ -55,6 +62,8 @@ const material = new THREE.MeshBasicMaterial({
 const morphObject = new THREE.Mesh(geometry, material);
 scene.add(morphObject);
 
+// ================= Clock =================
+
 const clock = new THREE.Clock();
 
 // ================= Animate Function =================
@@ -62,6 +71,11 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const time = clock.getElapsedTime();
+
+  // Smoothing: Angleiche alle Zielwerte
+  currentMorphIntensity += (targetMorphIntensity - currentMorphIntensity) * smoothingFactor;
+  currentMorphFrequency += (targetMorphFrequency - currentMorphFrequency) * smoothingFactor;
+  currentNoiseFactor     += (targetNoiseFactor - currentNoiseFactor) * smoothingFactor;
 
   // Aktualisiere die Scheitelpunkte des Objekts
   const positions = morphObject.geometry.attributes.position.array;
@@ -75,13 +89,13 @@ function animate() {
     const oz = origPositions[ix + 2];
 
     // Kombiniere einen Sinus-Effekt mit einem "Rausch"-Effekt
-    const sinOffset = Math.sin(time + (ox + oy + oz) * morphFrequency);
-    const noiseOffset = noiseFactor * Math.sin(time * 0.5 + (ox - oy + oz));
+    const sinOffset = Math.sin(time + (ox + oy + oz) * currentMorphFrequency);
+    const noiseOffset = currentNoiseFactor * Math.sin(time * 0.5 + (ox - oy + oz));
     const offset = sinOffset + noiseOffset;
 
-    positions[ix]     = ox + ox * offset * morphIntensity;
-    positions[ix + 1] = oy + oy * offset * morphIntensity;
-    positions[ix + 2] = oz + oz * offset * morphIntensity;
+    positions[ix]     = ox + ox * offset * currentMorphIntensity;
+    positions[ix + 1] = oy + oy * offset * currentMorphIntensity;
+    positions[ix + 2] = oz + oz * offset * currentMorphIntensity;
   }
   morphObject.geometry.attributes.position.needsUpdate = true;
 
@@ -96,7 +110,6 @@ function animate() {
   composer.render();
 }
 animate();
-
 
 // ================= RNBO Integration =================
 
@@ -194,20 +207,20 @@ function updateSliderFromRNBO(id, value) {
 function attachRNBOMessages(device) {
   const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"];
 
-  if (device.parameterChangeEvent) {
-    device.parameterChangeEvent.subscribe(param => {
-      if (param.id === "morph") {
-        morphIntensity = parseFloat(param.value);
-        console.log(`Morph intensity updated: ${morphIntensity}`);
-      }
-      if (param.id === "morphFrequency") {
-        morphFrequency = parseFloat(param.value);
-        console.log(`Morph frequency updated: ${morphFrequency}`);
-      }
-      if (param.id === "noiseFactor") {
-        noiseFactor = parseFloat(param.value);
-        console.log(`Noise factor updated: ${noiseFactor}`);
-      }
+    if (device.messageEvent) {
+      device.messageEvent.subscribe(ev => {
+        if (ev.tag === "morph") {
+          targetMorphIntensity = parseFloat(ev.payload);
+          console.log(`Target morph intensity updated: ${targetMorphIntensity}`);
+        }
+        if (ev.tag === "morphFrequency") {
+          targetMorphFrequency = parseFloat(ev.payload);
+          console.log(`Target morph frequency updated: ${targetMorphFrequency}`);
+        }
+        if (ev.tag === "noiseFactor") {
+          targetNoiseFactor = parseFloat(ev.payload);
+          console.log(`Target noise factor updated: ${targetNoiseFactor}`);
+        }
       // Bestehende Steuerung für Slider und Buttons
       if (controlIds.includes(param.id)) {
         if (param.id.startsWith("b")) {
@@ -217,29 +230,6 @@ function attachRNBOMessages(device) {
         }
       }
       console.log(`Parameter ${param.id} geändert: ${param.value}`);
-    });
-  } else if (device.messageEvent) {
-    device.messageEvent.subscribe(ev => {
-      if (ev.tag === "morph") {
-        morphIntensity = parseFloat(ev.payload);
-        console.log(`Morph intensity updated: ${morphIntensity}`);
-      }
-      if (ev.tag === "morphFrequency") {
-        morphFrequency = parseFloat(ev.payload);
-        console.log(`Morph frequency updated: ${morphFrequency}`);
-      }
-      if (ev.tag === "noiseFactor") {
-        noiseFactor = parseFloat(ev.payload);
-        console.log(`Noise factor updated: ${noiseFactor}`);
-      }
-      if (controlIds.includes(ev.tag)) {
-        if (ev.tag.startsWith("b")) {
-          updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
-        } else {
-          updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
-        }
-      }
-      console.log(`Message ${ev.tag}: ${ev.payload}`);
     });
   }
 }
