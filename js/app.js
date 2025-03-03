@@ -158,7 +158,7 @@ async function setupRNBO() {
   
   device.node.connect(outputNode);
   attachOutports(device);
-  makeRotarySliders(device);
+  attachRNBOMessages(device);
   
   // Resume AudioContext bei Nutzerinteraktion
   document.body.onclick = () => context.resume();
