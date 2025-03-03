@@ -271,16 +271,25 @@ function updateSliderFromRNBO(id, value) {
   }
 }
 
-// Beispiel: RNBO Nachrichten verarbeiten und den Slider aktualisieren
 function attachRNBOMessages(device) {
-  device.messageEvent.subscribe((ev) => {
-    // Erwartet werden Parameter mit IDs s1 bis s8
-    const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
-    if (sliderIds.includes(ev.tag)) {
-      updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
-    }
-    console.log(`${ev.tag}: ${ev.payload}`);
-  });
+  // Wir erwarten Parameter mit IDs "s1" bis "s8"
+  const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
+  if (device.parameterChangeEvent) {
+    device.parameterChangeEvent.subscribe(param => {
+      if (sliderIds.includes(param.id)) {
+        updateSliderFromRNBO(param.id, parseFloat(param.value));
+      }
+      console.log(`Parameter ${param.id} changed to ${param.value}`);
+    });
+  } else if (device.messageEvent) {
+    // Falls parameterChangeEvent nicht vorhanden ist, versuche messageEvent.
+    device.messageEvent.subscribe(ev => {
+      if (sliderIds.includes(ev.tag)) {
+        updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
+      }
+      console.log(`Message ${ev.tag}: ${ev.payload}`);
+    });
+  }
 }
 
 // Aufruf: Starte das Setup, wenn das DOM geladen ist.
