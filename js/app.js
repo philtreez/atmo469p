@@ -242,9 +242,7 @@ function setupRotarySliders() {
   });
 }
 
-// Funktion zum Senden des Parameterwerts an RNBO
 function sendParameter(id, value) {
-  // Beispiel: Falls dein RNBO-Gerät über sendMessage(tag, payload) verfügt:
   if (window.rnboDevice && rnboDevice.sendMessage) {
     rnboDevice.sendMessage(id, value);
   } else {
@@ -353,9 +351,7 @@ function updateVolumeSliderFromRNBO(value) {
   thumb.style.left = newLeft + "px";
 }
 
-// Beispiel: Funktion zum Senden des Wertes an RNBO
 function sendParameter(id, value) {
-  // Falls dein RNBO-Gerät eine Funktion sendMessage(tag, payload) hat:
   if (window.rnboDevice && rnboDevice.sendMessage) {
     rnboDevice.sendMessage(id, value);
   } else {
