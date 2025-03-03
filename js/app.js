@@ -100,16 +100,17 @@ function animate() {
   morphObject.geometry.attributes.position.needsUpdate = true;
 
   // Drehe das Objekt für einen dynamischen Effekt
-  morphObject.rotation.x += 0.002;
-  morphObject.rotation.y += 0.002;
+  morphObject.rotation.x += 0.005;
+  morphObject.rotation.y += 0.005;
 
   // Optionale leichte Kamera-Bewegung
-  camera.position.x = Math.sin(time * 0.3) * 0.3;
-  camera.rotation.y = Math.sin(time * 0.2) * 0.1;
+  camera.position.x = Math.sin(time * 0.5) * 0.5;
+  camera.rotation.y = Math.sin(time * 0.3) * 0.1;
 
   composer.render();
 }
 animate();
+
 
 // ================= RNBO Integration =================
 
@@ -207,20 +208,20 @@ function updateSliderFromRNBO(id, value) {
 function attachRNBOMessages(device) {
   const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"];
 
-    if (device.messageEvent) {
-      device.messageEvent.subscribe(ev => {
-        if (ev.tag === "morph") {
-          targetMorphIntensity = parseFloat(ev.payload);
-          console.log(`Target morph intensity updated: ${targetMorphIntensity}`);
-        }
-        if (ev.tag === "morphFrequency") {
-          targetMorphFrequency = parseFloat(ev.payload);
-          console.log(`Target morph frequency updated: ${targetMorphFrequency}`);
-        }
-        if (ev.tag === "noiseFactor") {
-          targetNoiseFactor = parseFloat(ev.payload);
-          console.log(`Target noise factor updated: ${targetNoiseFactor}`);
-        }
+  if (device.parameterChangeEvent) {
+    device.parameterChangeEvent.subscribe(param => {
+      if (param.id === "morph") {
+        targetMorphIntensity = parseFloat(param.value);
+        console.log(`Target morph intensity updated: ${targetMorphIntensity}`);
+      }
+      if (param.id === "morphFrequency") {
+        targetMorphFrequency = parseFloat(param.value);
+        console.log(`Target morph frequency updated: ${targetMorphFrequency}`);
+      }
+      if (param.id === "noiseFactor") {
+        targetNoiseFactor = parseFloat(param.value);
+        console.log(`Target noise factor updated: ${targetNoiseFactor}`);
+      }
       // Bestehende Steuerung für Slider und Buttons
       if (controlIds.includes(param.id)) {
         if (param.id.startsWith("b")) {
@@ -230,6 +231,29 @@ function attachRNBOMessages(device) {
         }
       }
       console.log(`Parameter ${param.id} geändert: ${param.value}`);
+    });
+  } else if (device.messageEvent) {
+    device.messageEvent.subscribe(ev => {
+      if (ev.tag === "morph") {
+        targetMorphIntensity = parseFloat(ev.payload);
+        console.log(`Target morph intensity updated: ${targetMorphIntensity}`);
+      }
+      if (ev.tag === "morphFrequency") {
+        targetMorphFrequency = parseFloat(ev.payload);
+        console.log(`Target morph frequency updated: ${targetMorphFrequency}`);
+      }
+      if (ev.tag === "noiseFactor") {
+        targetNoiseFactor = parseFloat(ev.payload);
+        console.log(`Target noise factor updated: ${targetNoiseFactor}`);
+      }
+      if (controlIds.includes(ev.tag)) {
+        if (ev.tag.startsWith("b")) {
+          updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
+        } else {
+          updateSliderFromRNBO(ev.tag, parseFloat(ev.payload));
+        }
+      }
+      console.log(`Message ${ev.tag}: ${ev.payload}`);
     });
   }
 }
@@ -351,7 +375,7 @@ function setupVolumeSlider() {
   const thumbWidth = thumb.offsetWidth;
   const maxMovement = sliderWidth - thumbWidth;
   
-  const initialValue = 0.05;
+  const initialValue = 0.8;
   const initialX = maxMovement * initialValue;
   thumb.style.left = initialX + "px";
   sendValueToRNBO("vol", initialValue);
