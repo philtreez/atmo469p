@@ -37,9 +37,13 @@ composer.addPass(glitchPass);
 
 // ================= Morphing 3D-Objekt Setup =================
 
-// Erstelle eine feingetesselte Kugelgeometrie, die als Basis für das Morphing dient
+// Globale Variable, die die Intensität des Morphing-Effekts steuert.
+// Dieser Wert wird per RNBO-Nachricht (Tag: "morph") aktualisiert.
+let morphIntensity = 0.3;
+
+// Erstelle eine feingetesselte Kugelgeometrie als Basis für das Morphing
 const geometry = new THREE.SphereGeometry(1.5, 128, 128);
-// Speichere die ursprünglichen Positionen der Vertices als Basis
+// Speichere die ursprünglichen Vertex-Positionen
 geometry.userData.origPositions = geometry.attributes.position.array.slice(0);
 
 const material = new THREE.MeshBasicMaterial({
@@ -60,38 +64,36 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   const time = clock.getElapsedTime();
-  
-  // Aktualisiere alle Scheitelpunkte für den morphenden Effekt
+
+  // Aktualisiere die Scheitelpunkte des Objekts
   const positions = morphObject.geometry.attributes.position.array;
   const origPositions = morphObject.geometry.userData.origPositions;
   const vertexCount = positions.length / 3;
-  
+
   for (let i = 0; i < vertexCount; i++) {
     const ix = i * 3;
     const ox = origPositions[ix];
     const oy = origPositions[ix + 1];
     const oz = origPositions[ix + 2];
-    
-    // Psychedelischer Offset basierend auf Zeit und den Originalkoordinaten
+
+    // Der Offset wird mit dem morphIntensity-Wert skaliert – so kannst du die Wirkung per RNBO steuern.
     const offset = Math.sin(time + ox * 4 + oy * 4 + oz * 4);
-    
-    positions[ix]     = ox + ox * offset * 0.3;
-    positions[ix + 1] = oy + oy * offset * 0.3;
-    positions[ix + 2] = oz + oz * offset * 0.3;
+    positions[ix]     = ox + ox * offset * morphIntensity;
+    positions[ix + 1] = oy + oy * offset * morphIntensity;
+    positions[ix + 2] = oz + oz * offset * morphIntensity;
   }
   morphObject.geometry.attributes.position.needsUpdate = true;
-  
-  // Drehe das Objekt für zusätzliche Dynamik
+
+  // Leichte Rotation für zusätzlichen Effekt
   morphObject.rotation.x += 0.005;
   morphObject.rotation.y += 0.005;
-  
-  // Optionale leichte Kamera-Bewegung für einen dynamischen Blickwinkel
+
+  // Optionale Kamera-Bewegung für einen dynamischen Blickwinkel
   camera.position.x = Math.sin(time * 0.5) * 0.5;
   camera.rotation.y = Math.sin(time * 0.3) * 0.1;
-  
+
   composer.render();
 }
-
 animate();
 
 // ================= RNBO Integration =================
@@ -188,10 +190,18 @@ function updateSliderFromRNBO(id, value) {
 }
 
 function attachRNBOMessages(device) {
-  // Nur Parameter, die als Parameter kommen, nicht die reinen Outport-Nachrichten:
+  // Bestehende Steuerungs-IDs
   const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"];
+
+  // Überprüfung, ob der RNBO-Device Parameter-Änderungs-Events unterstützt
   if (device.parameterChangeEvent) {
     device.parameterChangeEvent.subscribe(param => {
+      // Hier reagiert die Form auf RNBO-Nachrichten:
+      if (param.id === "morph") {
+        morphIntensity = parseFloat(param.value);
+        console.log(`Morph intensity updated: ${morphIntensity}`);
+      }
+      // Bestehende Steuerung für Slider und Buttons
       if (controlIds.includes(param.id)) {
         if (param.id.startsWith("b")) {
           updateButtonFromRNBO(param.id, parseFloat(param.value));
@@ -203,6 +213,12 @@ function attachRNBOMessages(device) {
     });
   } else if (device.messageEvent) {
     device.messageEvent.subscribe(ev => {
+      // RNBO sendet hier die "morph"-Message
+      if (ev.tag === "morph") {
+        morphIntensity = parseFloat(ev.payload);
+        console.log(`Morph intensity updated: ${morphIntensity}`);
+      }
+      // Bestehende Steuerung für Slider und Buttons
       if (controlIds.includes(ev.tag)) {
         if (ev.tag.startsWith("b")) {
           updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
