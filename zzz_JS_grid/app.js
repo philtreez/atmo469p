@@ -35,63 +35,74 @@ const glitchPass = new THREE.GlitchPass();
 glitchPass.enabled = false;
 composer.addPass(glitchPass);
 
-// ================= Morphing 3D-Objekt Setup =================
+// ================= Tunnel-Effekt Setup =================
 
-// Erstelle eine feingetesselte Kugelgeometrie, die als Basis für das Morphing dient
-const geometry = new THREE.SphereGeometry(1.5, 128, 128);
-// Speichere die ursprünglichen Positionen der Vertices als Basis
-geometry.userData.origPositions = geometry.attributes.position.array.slice(0);
+// Parameter: 40 Slices, 5 Einheiten Abstand, 24 Einheiten/s Geschwindigkeit
+const numPlanes = 40;
+const planeSpacing = 5;
+const speed = 24;
+const tunnelPlanes = [];
 
-const material = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  wireframe: true
-});
+/**
+ * Erzeugt ein Grid als Shape-Geometrie mit einem sehr kleinen zentralen Loch.
+ * (Das "Loch" wird hier als sehr kleiner Bereich definiert, um den Tunnel-Look zu erhalten.)
+ */
+function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-width/2, -height/2);
+  shape.lineTo(width/2, -height/2);
+  shape.lineTo(width/2, height/2);
+  shape.lineTo(-width/2, height/2);
+  shape.lineTo(-width/2, -height/2);
+  
+  // Definiere ein sehr kleines "Loch": holeSize/8
+  const halfHole = holeSize / 8;
+  const holePath = new THREE.Path();
+  holePath.moveTo(-halfHole, -halfHole);
+  holePath.lineTo(halfHole, -halfHole);
+  holePath.lineTo(halfHole, halfHole);
+  holePath.lineTo(-halfHole, halfHole);
+  holePath.lineTo(-halfHole, -halfHole);
+  shape.holes.push(holePath);
+  
+  return new THREE.ShapeGeometry(shape, segments);
+}
 
-const morphObject = new THREE.Mesh(geometry, material);
-scene.add(morphObject);
+const gridGeometry = createGridWithSquareHoleGeometry(30, 30, 20, 20);
 
-// ================= Clock =================
+function createGridMaterial() {
+  return new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+}
+
+for (let i = 0; i < numPlanes; i++) {
+  const material = createGridMaterial();
+  const gridMesh = new THREE.Mesh(gridGeometry, material);
+  gridMesh.position.z = -i * planeSpacing;
+  tunnelPlanes.push(gridMesh);
+  scene.add(gridMesh);
+}
 
 const clock = new THREE.Clock();
-
-// ================= Animate Function =================
 
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
-  const time = clock.getElapsedTime();
   
-  // Aktualisiere alle Scheitelpunkte für den morphenden Effekt
-  const positions = morphObject.geometry.attributes.position.array;
-  const origPositions = morphObject.geometry.userData.origPositions;
-  const vertexCount = positions.length / 3;
+  // Optionale Kamera-Bewegung:
+  camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
+  camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
   
-  for (let i = 0; i < vertexCount; i++) {
-    const ix = i * 3;
-    const ox = origPositions[ix];
-    const oy = origPositions[ix + 1];
-    const oz = origPositions[ix + 2];
-    
-    // Psychedelischer Offset basierend auf Zeit und den Originalkoordinaten
-    const offset = Math.sin(time + ox * 4 + oy * 4 + oz * 4);
-    
-    positions[ix]     = ox + ox * offset * 0.3;
-    positions[ix + 1] = oy + oy * offset * 0.3;
-    positions[ix + 2] = oz + oz * offset * 0.3;
-  }
-  morphObject.geometry.attributes.position.needsUpdate = true;
-  
-  // Drehe das Objekt für zusätzliche Dynamik
-  morphObject.rotation.x += 0.005;
-  morphObject.rotation.y += 0.005;
-  
-  // Optionale leichte Kamera-Bewegung für einen dynamischen Blickwinkel
-  camera.position.x = Math.sin(time * 0.5) * 0.5;
-  camera.rotation.y = Math.sin(time * 0.3) * 0.1;
+  tunnelPlanes.forEach(mesh => {
+    mesh.position.z += speed * delta;
+    mesh.position.x = Math.sin((mesh.position.z + clock.elapsedTime) * 0.1) * 0.5;
+    mesh.rotation.z = Math.sin((mesh.position.z + clock.elapsedTime) * 0.1) * 0.1;
+    if (mesh.position.z > camera.position.z + planeSpacing / 2) {
+      mesh.position.z -= numPlanes * planeSpacing;
+    }
+  });
   
   composer.render();
 }
-
 animate();
 
 // ================= RNBO Integration =================
