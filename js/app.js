@@ -37,7 +37,7 @@ composer.addPass(glitchPass);
 
 // ================= Tunnel-Effekt Setup =================
 
-// Hier definieren wir den Tunnel als eine Serie von Slices (Mesh) entlang der Z-Achse.
+// Parameter: 40 Slices, 5 Einheiten Abstand, 24 Einheiten/s Geschwindigkeit
 const numPlanes = 40;
 const planeSpacing = 5;
 const speed = 24;
@@ -45,16 +45,17 @@ const tunnelPlanes = [];
 
 /**
  * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen kleinen Loch.
- * (Hinweis: Das "Loch" wird hier als sehr kleiner Bereich definiert, damit der Tunnel-Look erhalten bleibt.)
+ * (Das "Loch" wird hier als sehr kleiner Bereich definiert.)
  */
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   const shape = new THREE.Shape();
-  shape.moveTo(-width / 2, -height / 2);
-  shape.lineTo(width / 2, -height / 2);
-  shape.lineTo(width / 2, height / 2);
-  shape.lineTo(-width / 2, height / 2);
-  shape.lineTo(-width / 2, -height / 2);
-  // Definiere ein sehr kleines "Loch" in der Mitte (holeSize/8)
+  shape.moveTo(-width/2, -height/2);
+  shape.lineTo(width/2, -height/2);
+  shape.lineTo(width/2, height/2);
+  shape.lineTo(-width/2, height/2);
+  shape.lineTo(-width/2, -height/2);
+  
+  // Kleines "Loch" – hier wird holeSize durch 8 geteilt.
   const halfHole = holeSize / 8;
   const holePath = new THREE.Path();
   holePath.moveTo(-halfHole, -halfHole);
@@ -63,6 +64,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   holePath.lineTo(-halfHole, halfHole);
   holePath.lineTo(-halfHole, -halfHole);
   shape.holes.push(holePath);
+  
   return new THREE.ShapeGeometry(shape, segments);
 }
 
@@ -86,7 +88,7 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   
-  // Optional: leichte Kamera-Animation
+  // Optionale Kamera-Bewegung
   camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
   camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
   
@@ -105,12 +107,8 @@ animate();
 
 // ================= RNBO Integration =================
 
-// Globales RNBO-Gerät – wird später gesetzt
 window.rnboDevice = null;
-// Damit sendValueToRNBO im Volume- und Rotary-Slider funktioniert, speichern wir das RNBO-Gerät auch in einer globalen Variable "device".
-window.device = null;
-
-// Wir verwenden hier einen einfachen Parameter-Queue, falls Slider-Eingaben erfolgen, bevor RNBO bereit ist.
+window.device = null; // Für sendValueToRNBO
 let parameterQueue = {};
 
 async function setupRNBO() {
@@ -141,7 +139,7 @@ async function setupRNBO() {
   }
   
   window.rnboDevice = deviceInstance;
-  window.device = deviceInstance; // Für sendValueToRNBO
+  window.device = deviceInstance;
   deviceInstance.node.connect(outputNode);
   attachRNBOMessages(deviceInstance);
   attachOutports(deviceInstance);
@@ -167,7 +165,6 @@ function loadRNBOScript(version) {
   });
 }
 
-// Sendet den Parameterwert an RNBO; wenn device noch nicht verfügbar, wird er in der Queue gespeichert.
 function sendValueToRNBO(param, value) {
   if (window.device && window.device.parametersById && window.device.parametersById.has(param)) {
     window.device.parametersById.get(param).value = value;
@@ -178,7 +175,6 @@ function sendValueToRNBO(param, value) {
   }
 }
 
-// Sobald device verfügbar ist, werden alle zwischengespeicherten Werte gesendet.
 function flushParameterQueue() {
   if (window.device && window.device.parametersById) {
     for (const [param, value] of Object.entries(parameterQueue)) {
@@ -191,13 +187,12 @@ function flushParameterQueue() {
   }
 }
 
-// Aktualisiert den Rotary-Slider visuell (0-1 entspricht 0 bis 270°)
 function updateSliderFromRNBO(id, value) {
   const slider = document.getElementById("slider-" + id);
   if (slider) {
-    const rotation = value * 2 * Math.PI; // intern in Radiant
-    slider.dataset.rotation = rotation;
-    const degrees = rotation * (270 / (2 * Math.PI));
+    // Hier interpretieren wir value (0–1) als Drehung von 0 bis 270°.
+    slider.dataset.value = value;
+    const degrees = value * 270;
     slider.style.transform = `rotate(${degrees}deg)`;
   }
 }
@@ -222,10 +217,11 @@ function attachRNBOMessages(device) {
 }
 
 function attachOutports(device) {
-  device.messageEvent.subscribe((ev) => {
+  device.messageEvent.subscribe(ev => {
     if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
       const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
       const randomPlane = tunnelPlanes[randomIndex];
+      
       const edges = new THREE.EdgesGeometry(gridGeometry);
       const lineMaterial = new THREE.LineBasicMaterial({
         color: 0x00ff82,
@@ -271,36 +267,32 @@ function setupRotarySliders() {
     slider.style.transform = "rotate(0deg)";
     slider.style.touchAction = "none";
     
-    slider.dataset.rotation = "0";
+    // Wir speichern hier den aktuellen normierten Wert (0-1) im Dataset.
+    slider.dataset.value = "0";
     
     let isDragging = false;
-    let startAngle = 0;
-    let initialRotation = 0;
+    let startY = 0;
+    let initialValue = 0;
+    // Sensitivität: wie viel sich der Wert pro Pixel ändert.
+    const sensitivity = 0.005; // z. B. 1 Einheit pro 200px Bewegung
     
     slider.addEventListener("pointerdown", (e) => {
       isDragging = true;
-      const rect = slider.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-      initialRotation = parseFloat(slider.dataset.rotation);
+      startY = e.clientY;
+      initialValue = parseFloat(slider.dataset.value);
       slider.setPointerCapture(e.pointerId);
     });
     
     slider.addEventListener("pointermove", (e) => {
       if (!isDragging) return;
-      const rect = slider.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-      const deltaAngle = angle - startAngle;
-      const newRotation = initialRotation + deltaAngle;
-      slider.dataset.rotation = newRotation;
-      // 0-1 entspricht 0 bis 270° Drehung
-      const degrees = (((newRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI)) * (270 / (2 * Math.PI));
+      const deltaY = startY - e.clientY; // nach oben ziehen erhöht den Wert
+      let newValue = initialValue + deltaY * sensitivity;
+      newValue = Math.max(0, Math.min(newValue, 1));
+      slider.dataset.value = newValue.toString();
+      // Visual: 0-1 entspricht 0 bis 270° Drehung
+      const degrees = newValue * 270;
       slider.style.transform = `rotate(${degrees}deg)`;
-      const normalizedValue = (((newRotation % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI)) / (2 * Math.PI);
-      sendValueToRNBO(id, normalizedValue);
+      sendValueToRNBO(id, newValue);
     });
     
     slider.addEventListener("pointerup", () => { isDragging = false; });
@@ -312,18 +304,17 @@ function setupRotarySliders() {
 // Hier verwenden wir den Stil aus deinem Beispiel (IDs: volume-slider, volume-thumb)
 
 function setupVolumeSlider() {
-  const slider = document.getElementById("volume-slider");  // Container, z. B. 280px x 40px
-  const thumb = document.getElementById("volume-thumb");      // Thumb, z. B. 70px x 70px
+  const slider = document.getElementById("volume-slider");  // Container, z. B. 280px x 40px
+  const thumb = document.getElementById("volume-thumb");      // Thumb, z. B. 70px x 70px
   if (!slider || !thumb) {
     console.error("Volume slider elements not found!");
     return;
   }
   
-  const sliderWidth = slider.offsetWidth;   // Erwartet z. B. 280px
-  const thumbWidth = thumb.offsetWidth;       // Erwartet z. B. 70px
-  const maxMovement = sliderWidth - thumbWidth; // z. B. 210px
+  const sliderWidth = slider.offsetWidth;   // z. B. 280px
+  const thumbWidth = thumb.offsetWidth;       // z. B. 70px
+  const maxMovement = sliderWidth - thumbWidth; // z. B. 210px
   
-  // Initialen Wert setzen, z. B. 0.8
   const initialValue = 0.8;
   const initialX = maxMovement * initialValue;
   thumb.style.left = initialX + "px";
@@ -338,16 +329,14 @@ function setupVolumeSlider() {
   document.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
     const sliderRect = slider.getBoundingClientRect();
-    let newX = e.clientX - sliderRect.left - (thumbWidth / 2);
+    let newX = e.clientX - sliderRect.left - (thumb.offsetWidth / 2);
     newX = Math.max(0, Math.min(newX, maxMovement));
     thumb.style.left = newX + "px";
     const normalizedValue = newX / maxMovement;
     sendValueToRNBO("vol", normalizedValue);
   });
   
-  document.addEventListener("mouseup", () => {
-    isDragging = false;
-  });
+  document.addEventListener("mouseup", () => { isDragging = false; });
 }
 
 function updateVolumeSliderFromRNBO(value) {
