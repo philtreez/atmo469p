@@ -1,3 +1,40 @@
+// ================= Three.js + Post-Processing Setup =================
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.z = 5;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+const threeContainer = document.getElementById("threejs-container") || document.body;
+threeContainer.appendChild(renderer.domElement);
+
+const composer = new THREE.EffectComposer(renderer);
+const renderPass = new THREE.RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new THREE.UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.5,  // Stärke
+  0.1,  // Radius
+  0.3   // Schwellenwert
+);
+bloomPass.threshold = 0;
+bloomPass.strength = 0.5;
+bloomPass.radius = 0.2;
+composer.addPass(bloomPass);
+
+const glitchPass = new THREE.GlitchPass();
+glitchPass.enabled = false;
+composer.addPass(glitchPass);
+
 // ================= Zusätzliche Parameter =================
 let morphIntensity = 0.3;    // Steuert die allgemeine Verzerrungsstärke (0 bis 1)
 let morphFrequency = 4.0;    // Bestimmt die Frequenz der Sinuswellen
