@@ -27,7 +27,7 @@ const bloomPass = new THREE.UnrealBloomPass(
   0.3   // Schwellenwert
 );
 bloomPass.threshold = 0;
-bloomPass.strength = 0.5;
+bloomPass.strength = 0.3;
 bloomPass.radius = 0.2;
 composer.addPass(bloomPass);
 
