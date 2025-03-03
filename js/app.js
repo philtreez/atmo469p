@@ -44,7 +44,7 @@ const speed = 24;
 const tunnelPlanes = [];
 
 /**
- * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen kleinen Loch.
+ * Erzeugt ein Grid als Shape-Geometrie mit einem zentralen, kleinen Loch.
  * (Das "Loch" wird hier als sehr kleiner Bereich definiert.)
  */
 function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
@@ -55,7 +55,7 @@ function createGridWithSquareHoleGeometry(width, height, holeSize, segments) {
   shape.lineTo(-width/2, height/2);
   shape.lineTo(-width/2, -height/2);
   
-  // Kleines "Loch" – hier wird holeSize durch 8 geteilt.
+  // Das "Loch" wird als kleiner Bereich definiert (holeSize/8)
   const halfHole = holeSize / 8;
   const holePath = new THREE.Path();
   holePath.moveTo(-halfHole, -halfHole);
@@ -88,7 +88,7 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   
-  // Optionale Kamera-Bewegung
+  // Optionale Kamera-Bewegung:
   camera.position.x = Math.sin(clock.elapsedTime * 0.5) * 0.5;
   camera.rotation.y = Math.sin(clock.elapsedTime * 0.3) * 0.1;
   
@@ -190,9 +190,9 @@ function flushParameterQueue() {
 function updateSliderFromRNBO(id, value) {
   const slider = document.getElementById("slider-" + id);
   if (slider) {
-    // Hier interpretieren wir value (0–1) als Drehung von 0 bis 270°.
-    slider.dataset.value = value;
+    // Visualisierung: 0-1 entspricht 0 bis 270° Drehung
     const degrees = value * 270;
+    slider.dataset.value = value;
     slider.style.transform = `rotate(${degrees}deg)`;
   }
 }
@@ -221,7 +221,6 @@ function attachOutports(device) {
     if (ev.tag === "grider" && parseInt(ev.payload) === 1) {
       const randomIndex = Math.floor(Math.random() * tunnelPlanes.length);
       const randomPlane = tunnelPlanes[randomIndex];
-      
       const edges = new THREE.EdgesGeometry(gridGeometry);
       const lineMaterial = new THREE.LineBasicMaterial({
         color: 0x00ff82,
@@ -250,8 +249,11 @@ function attachOutports(device) {
 
 // ================= Rotary Slider Setup (IDs: slider-s1 ... slider-s8) =================
 
+// Hier passen wir die Bedienung so an, dass sowohl horizontale als auch vertikale Bewegungen berücksichtigt werden.
 function setupRotarySliders() {
   const sliderIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"];
+  // Sensitivität: Änderung pro Pixel (anpassen, falls nötig)
+  const sensitivity = 0.005; 
   
   sliderIds.forEach(id => {
     const slider = document.getElementById("slider-" + id);
@@ -267,17 +269,17 @@ function setupRotarySliders() {
     slider.style.transform = "rotate(0deg)";
     slider.style.touchAction = "none";
     
-    // Wir speichern hier den aktuellen normierten Wert (0-1) im Dataset.
+    // Wir speichern den aktuellen normierten Wert (0-1) im Dataset.
     slider.dataset.value = "0";
     
     let isDragging = false;
+    let startX = 0;
     let startY = 0;
     let initialValue = 0;
-    // Sensitivität: wie viel sich der Wert pro Pixel ändert.
-    const sensitivity = 0.005; // z. B. 1 Einheit pro 200px Bewegung
     
     slider.addEventListener("pointerdown", (e) => {
       isDragging = true;
+      startX = e.clientX;
       startY = e.clientY;
       initialValue = parseFloat(slider.dataset.value);
       slider.setPointerCapture(e.pointerId);
@@ -285,12 +287,14 @@ function setupRotarySliders() {
     
     slider.addEventListener("pointermove", (e) => {
       if (!isDragging) return;
-      const deltaY = startY - e.clientY; // nach oben ziehen erhöht den Wert
-      let newValue = initialValue + deltaY * sensitivity;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      // Hier addieren wir horizontal und vertikal: Ziehen nach rechts und nach oben erhöht den Wert.
+      const delta = (dx - dy) * sensitivity;
+      let newValue = initialValue + delta;
       newValue = Math.max(0, Math.min(newValue, 1));
       slider.dataset.value = newValue.toString();
-      // Visual: 0-1 entspricht 0 bis 270° Drehung
-      const degrees = newValue * 270;
+      const degrees = newValue * 270;  // 0-1 entspricht 0 bis 270° Drehung
       slider.style.transform = `rotate(${degrees}deg)`;
       sendValueToRNBO(id, newValue);
     });
@@ -301,26 +305,28 @@ function setupRotarySliders() {
 }
 
 // ================= Volume Slider Setup =================
-// Hier verwenden wir den Stil aus deinem Beispiel (IDs: volume-slider, volume-thumb)
+// Verwende hier den Stil aus deinem Beispiel (IDs: volume-slider, volume-thumb)
 
 function setupVolumeSlider() {
-  const slider = document.getElementById("volume-slider");  // Container, z. B. 280px x 40px
-  const thumb = document.getElementById("volume-thumb");      // Thumb, z. B. 70px x 70px
+  const slider = document.getElementById("volume-slider");
+  const thumb = document.getElementById("volume-thumb");
   if (!slider || !thumb) {
     console.error("Volume slider elements not found!");
     return;
   }
   
-  const sliderWidth = slider.offsetWidth;   // z. B. 280px
-  const thumbWidth = thumb.offsetWidth;       // z. B. 70px
-  const maxMovement = sliderWidth - thumbWidth; // z. B. 210px
+  const sliderWidth = slider.offsetWidth;  // z. B. 280px
+  const thumbWidth = thumb.offsetWidth;      // z. B. 70px
+  const maxMovement = sliderWidth - thumbWidth; // z. B. 210px
   
+  // Setze initialen Wert, z. B. 0.8
   const initialValue = 0.8;
   const initialX = maxMovement * initialValue;
   thumb.style.left = initialX + "px";
   sendValueToRNBO("vol", initialValue);
   
   let isDragging = false;
+  
   thumb.addEventListener("mousedown", (e) => {
     isDragging = true;
     e.preventDefault();
