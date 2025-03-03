@@ -1,45 +1,9 @@
-// ================= Three.js + Post-Processing Setup =================
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
-
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-camera.position.z = 5;
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-const threeContainer = document.getElementById("threejs-container") || document.body;
-threeContainer.appendChild(renderer.domElement);
-
-const composer = new THREE.EffectComposer(renderer);
-const renderPass = new THREE.RenderPass(scene, camera);
-composer.addPass(renderPass);
-
-const bloomPass = new THREE.UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.5,  // Stärke
-  0.1,  // Radius
-  0.3   // Schwellenwert
-);
-bloomPass.threshold = 0;
-bloomPass.strength = 0.5;
-bloomPass.radius = 0.2;
-composer.addPass(bloomPass);
-
-const glitchPass = new THREE.GlitchPass();
-glitchPass.enabled = false;
-composer.addPass(glitchPass);
+// ================= Zusätzliche Parameter =================
+let morphIntensity = 0.3;    // Steuert die allgemeine Verzerrungsstärke (0 bis 1)
+let morphFrequency = 4.0;    // Bestimmt die Frequenz der Sinuswellen
+let noiseFactor = 0.1;       // Fügt einen zusätzlichen Rauschanteil hinzu
 
 // ================= Morphing 3D-Objekt Setup =================
-
-// Globale Variable, die die Intensität des Morphing-Effekts steuert.
-// Dieser Wert wird per RNBO-Nachricht (Tag: "morph") aktualisiert.
-let morphIntensity = 0.3;
 
 // Erstelle eine feingetesselte Kugelgeometrie als Basis für das Morphing
 const geometry = new THREE.SphereGeometry(1.5, 128, 128);
@@ -54,15 +18,10 @@ const material = new THREE.MeshBasicMaterial({
 const morphObject = new THREE.Mesh(geometry, material);
 scene.add(morphObject);
 
-// ================= Clock =================
-
-const clock = new THREE.Clock();
-
 // ================= Animate Function =================
 
 function animate() {
   requestAnimationFrame(animate);
-  const delta = clock.getDelta();
   const time = clock.getElapsedTime();
 
   // Aktualisiere die Scheitelpunkte des Objekts
@@ -76,25 +35,29 @@ function animate() {
     const oy = origPositions[ix + 1];
     const oz = origPositions[ix + 2];
 
-    // Der Offset wird mit dem morphIntensity-Wert skaliert – so kannst du die Wirkung per RNBO steuern.
-    const offset = Math.sin(time + ox * 4 + oy * 4 + oz * 4);
+    // Kombiniere einen Sinus-Effekt mit einem "Rausch"-Effekt
+    const sinOffset = Math.sin(time + (ox + oy + oz) * morphFrequency);
+    const noiseOffset = noiseFactor * Math.sin(time * 0.5 + (ox - oy + oz));
+    const offset = sinOffset + noiseOffset;
+
     positions[ix]     = ox + ox * offset * morphIntensity;
     positions[ix + 1] = oy + oy * offset * morphIntensity;
     positions[ix + 2] = oz + oz * offset * morphIntensity;
   }
   morphObject.geometry.attributes.position.needsUpdate = true;
 
-  // Leichte Rotation für zusätzlichen Effekt
+  // Drehe das Objekt für einen dynamischen Effekt
   morphObject.rotation.x += 0.005;
   morphObject.rotation.y += 0.005;
 
-  // Optionale Kamera-Bewegung für einen dynamischen Blickwinkel
+  // Optionale leichte Kamera-Bewegung
   camera.position.x = Math.sin(time * 0.5) * 0.5;
   camera.rotation.y = Math.sin(time * 0.3) * 0.1;
 
   composer.render();
 }
 animate();
+
 
 // ================= RNBO Integration =================
 
@@ -190,16 +153,21 @@ function updateSliderFromRNBO(id, value) {
 }
 
 function attachRNBOMessages(device) {
-  // Bestehende Steuerungs-IDs
   const controlIds = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "vol", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"];
 
-  // Überprüfung, ob der RNBO-Device Parameter-Änderungs-Events unterstützt
   if (device.parameterChangeEvent) {
     device.parameterChangeEvent.subscribe(param => {
-      // Hier reagiert die Form auf RNBO-Nachrichten:
       if (param.id === "morph") {
         morphIntensity = parseFloat(param.value);
         console.log(`Morph intensity updated: ${morphIntensity}`);
+      }
+      if (param.id === "morphFrequency") {
+        morphFrequency = parseFloat(param.value);
+        console.log(`Morph frequency updated: ${morphFrequency}`);
+      }
+      if (param.id === "noiseFactor") {
+        noiseFactor = parseFloat(param.value);
+        console.log(`Noise factor updated: ${noiseFactor}`);
       }
       // Bestehende Steuerung für Slider und Buttons
       if (controlIds.includes(param.id)) {
@@ -213,12 +181,18 @@ function attachRNBOMessages(device) {
     });
   } else if (device.messageEvent) {
     device.messageEvent.subscribe(ev => {
-      // RNBO sendet hier die "morph"-Message
       if (ev.tag === "morph") {
         morphIntensity = parseFloat(ev.payload);
         console.log(`Morph intensity updated: ${morphIntensity}`);
       }
-      // Bestehende Steuerung für Slider und Buttons
+      if (ev.tag === "morphFrequency") {
+        morphFrequency = parseFloat(ev.payload);
+        console.log(`Morph frequency updated: ${morphFrequency}`);
+      }
+      if (ev.tag === "noiseFactor") {
+        noiseFactor = parseFloat(ev.payload);
+        console.log(`Noise factor updated: ${noiseFactor}`);
+      }
       if (controlIds.includes(ev.tag)) {
         if (ev.tag.startsWith("b")) {
           updateButtonFromRNBO(ev.tag, parseFloat(ev.payload));
