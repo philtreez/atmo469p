@@ -75,7 +75,7 @@ const smoothingFactor = 0.05;      // Kleinere Werte = glattere Übergänge
 const morphObjects = [];
 const loader = new THREE.GLTFLoader();
 loader.load(
-  'https://atmo469p-philtreezs-projects.vercel.app/real_p.glb', // Ersetze diesen Pfad mit dem Pfad zu deinem glTF-Modell
+  'https://atmo469p-philtreezs-projects.vercel.app/model/real_p.glb', // Ersetze diesen Pfad mit dem Pfad zu deinem glTF-Modell
   (gltf) => {
     gltf.scene.traverse((child) => {
       if (child.isMesh && child.geometry && child.geometry.isBufferGeometry) {
