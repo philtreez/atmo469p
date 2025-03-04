@@ -57,32 +57,40 @@ function createStarField() {
 }
 createStarField();
 
-// ================= Zusätzliche Parameter mit Smoothing =================
+// ================= Morphing Parameter mit Smoothing =================
+
 let targetMorphIntensity = 0.3;    // Wird per RNBO-Nachricht gesetzt
-let currentMorphIntensity = 0.3;   // Aktueller, geglätteter Wert
+let currentMorphIntensity = 0.3;
 
-let targetMorphFrequency = 4.0;    // Zielwert für die Frequenz
-let currentMorphFrequency = 4.0;   // Geglätteter Frequenzwert
+let targetMorphFrequency = 4.0;
+let currentMorphFrequency = 4.0;
 
-let targetNoiseFactor = 0.1;       // Zielwert für den Noise-Effekt
-let currentNoiseFactor = 0.1;      // Geglätteter Noise-Wert
+let targetNoiseFactor = 0.1;
+let currentNoiseFactor = 0.1;
 
 const smoothingFactor = 0.05;      // Kleinere Werte = glattere Übergänge
 
-// ================= Morphing 3D-Objekt Setup =================
+// ================= glTF Modell Laden und Morph-Objekte sammeln =================
 
-// Statt einer Kugel verwenden wir nun einen TorusKnot als Grundform
-const geometry = new THREE.TorusKnotGeometry(1.5, 0.4, 200, 32);
-// Speichere die ursprünglichen Vertex-Positionen
-geometry.userData.origPositions = geometry.attributes.position.array.slice(0);
-
-const material = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  wireframe: true
-});
-
-const morphObject = new THREE.Mesh(geometry, material);
-scene.add(morphObject);
+const morphObjects = [];
+const loader = new THREE.GLTFLoader();
+loader.load(
+  'https://atmo469p-philtreezs-projects.vercel.app/real_p.gltf', // Ersetze diesen Pfad mit dem Pfad zu deinem glTF-Modell
+  (gltf) => {
+    gltf.scene.traverse((child) => {
+      if (child.isMesh && child.geometry && child.geometry.isBufferGeometry) {
+        // Speichere die ursprünglichen Vertex-Positionen
+        child.geometry.userData.origPositions = child.geometry.attributes.position.array.slice(0);
+        morphObjects.push(child);
+      }
+    });
+    scene.add(gltf.scene);
+  },
+  undefined,
+  (error) => {
+    console.error('Fehler beim Laden des glTF-Modells:', error);
+  }
+);
 
 // ================= Clock =================
 
@@ -94,44 +102,55 @@ function animate() {
   requestAnimationFrame(animate);
   const time = clock.getElapsedTime();
 
-  // Smoothing: Angleiche die aktuellen Werte an die Zielwerte
+  // Smoothing: Aktualisiere die aktuellen Werte sanft in Richtung der Zielwerte
   currentMorphIntensity += (targetMorphIntensity - currentMorphIntensity) * smoothingFactor;
   currentMorphFrequency += (targetMorphFrequency - currentMorphFrequency) * smoothingFactor;
   currentNoiseFactor     += (targetNoiseFactor - currentNoiseFactor) * smoothingFactor;
 
-  // Aktualisiere die Scheitelpunkte des Objekts
-  const positions = morphObject.geometry.attributes.position.array;
-  const origPositions = morphObject.geometry.userData.origPositions;
-  const vertexCount = positions.length / 3;
+  // Wende den Morphing-Effekt auf alle gesammelten Meshes an
+  morphObjects.forEach((mesh) => {
+    const positions = mesh.geometry.attributes.position.array;
+    const origPositions = mesh.geometry.userData.origPositions;
+    const vertexCount = positions.length / 3;
 
-  for (let i = 0; i < vertexCount; i++) {
-    const ix = i * 3;
-    const ox = origPositions[ix];
-    const oy = origPositions[ix + 1];
-    const oz = origPositions[ix + 2];
+    for (let i = 0; i < vertexCount; i++) {
+      const ix = i * 3;
+      const ox = origPositions[ix];
+      const oy = origPositions[ix + 1];
+      const oz = origPositions[ix + 2];
 
-    // Kombiniere einen Sinus-Effekt mit einem "Rausch"-Effekt
-    const sinOffset = Math.sin(time + (ox + oy + oz) * currentMorphFrequency);
-    const noiseOffset = currentNoiseFactor * Math.sin(time * 0.5 + (ox - oy + oz));
-    const offset = sinOffset + noiseOffset;
+      // Berechne einen kombinierten Offset aus Sinus- und "Rausch"-Effekt
+      const sinOffset = Math.sin(time + (ox + oy + oz) * currentMorphFrequency);
+      const noiseOffset = currentNoiseFactor * Math.sin(time * 0.5 + (ox - oy + oz));
+      const offset = sinOffset + noiseOffset;
 
-    positions[ix]     = ox + ox * offset * currentMorphIntensity;
-    positions[ix + 1] = oy + oy * offset * currentMorphIntensity;
-    positions[ix + 2] = oz + oz * offset * currentMorphIntensity;
-  }
-  morphObject.geometry.attributes.position.needsUpdate = true;
+      positions[ix]     = ox + ox * offset * currentMorphIntensity;
+      positions[ix + 1] = oy + oy * offset * currentMorphIntensity;
+      positions[ix + 2] = oz + oz * offset * currentMorphIntensity;
+    }
+    mesh.geometry.attributes.position.needsUpdate = true;
 
-  // Drehe das Objekt für einen dynamischen Effekt
-  morphObject.rotation.x += 0.005;
-  morphObject.rotation.y += 0.005;
+    // Optionale Rotation pro Mesh
+    mesh.rotation.x += 0.005;
+    mesh.rotation.y += 0.005;
+  });
 
-  // Optionale leichte Kamera-Bewegung
+  // Optionale Kamera-Bewegung für einen dynamischen Effekt
   camera.position.x = Math.sin(time * 0.5) * 0.5;
   camera.rotation.y = Math.sin(time * 0.3) * 0.1;
 
   composer.render();
 }
 animate();
+
+// ================= Window Resize Handler =================
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
 
 
 // ================= RNBO Integration =================
